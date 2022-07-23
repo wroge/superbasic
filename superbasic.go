@@ -13,21 +13,9 @@ func toSQL(expr any, sep string) (string, []any, error) {
 	case Expression:
 		return t.ToSQL()
 	case []Expression:
-		a := make([]any, 0, len(t))
+		a := make([]any, len(t))
 		for i := range t {
-			if t[i].Err != nil {
-				return "", nil, t[i].Err
-			}
-
-			if t[i].SQL == "" {
-				continue
-			}
-
-			a = append(a, t[i])
-		}
-
-		if sep == "" {
-			sep = ", "
+			a[i] = t[i]
 		}
 
 		return Join(sep, a...).ToSQL()

@@ -46,13 +46,12 @@ or := [2]superbasic.Expression{
 }
 
 where := superbasic.SQL(
-    "WHERE ?",
+    " WHERE ?",
     superbasic.SQL("? OR ?", or[0], or[1]),
 )
 
-query := superbasic.SQL(
-    "SELECT ? FROM presidents ?",
-    columns, // []superbasic.Expression gets translated to Join(", ", expr...)
+query := superbasic.Append(
+    superbasic.SQL("SELECT ? FROM presidents", columns),
     where,
 )
 

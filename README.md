@@ -1,5 +1,8 @@
 # The superbasic SQL-Builder
 
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/wroge/wgs84)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wroge/wgs84)](https://goreportcard.com/report/github.com/wroge/wgs84)
+
 ```go get github.com/wroge/superbasic``` and use a super-simple SQL builder consisting of the three basic functions ```Append(expr...)```, ```Join(sep, expr...)``` and ```SQL(sql, expr...)```.
 
 ```go

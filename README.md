@@ -23,24 +23,36 @@ fmt.Println(insert.ToSQL())
 // [Joe Biden Donald Trump Barack Obama George W. Bush Bill Clinton George H. W. Bush]
 ```
 
-This library was written to be able to build dynamic queries in the simplest way possible. There is a ```ToPostgres``` function to translate expressions with ```$``` placeholders.
+This library is written to be able to build dynamic queries in the simplest way possible.
+Each ```Expression``` is automatically compiled to the correct place. ```[]Expression``` is converted to ```Join(sep, expr...)``` within ```Join``` expressions and to ```Join(", ", expr...)``` in all other cases.
+There is a ```ToPostgres``` function to translate expressions for Postgres databases.
 
 ```go
-var where superbasic.Expression
+columns := []superbasic.Expression{
+    superbasic.SQL("id"),
+    superbasic.SQL("first"),
+    superbasic.SQL("last"),
+}
 
-where = superbasic.SQL(
-    "WHERE ? OR ?",
+if len(columns) == 0 {
+    columns = []superbasic.Expression{
+        superbasic.SQL("*"),
+    }
+}
+
+or := [2]superbasic.Expression{
     superbasic.SQL("last = ?", "Bush"),
     superbasic.SQL("first = ?", "Joe"),
+}
+
+where := superbasic.SQL(
+    "WHERE ?",
+    superbasic.SQL("? OR ?", or[0], or[1]),
 )
 
 query := superbasic.SQL(
     "SELECT ? FROM presidents ?",
-    superbasic.Join(", ",
-        superbasic.SQL("id"),
-        superbasic.SQL("first"),
-        superbasic.SQL("last"),
-    ),
+    columns, // []superbasic.Expression gets translated to Join(", ", expr...)
     where,
 )
 

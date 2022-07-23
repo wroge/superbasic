@@ -8,10 +8,29 @@ import (
 
 var ErrInvalidNumberOfArguments = errors.New("invalid number of arguments")
 
-func toSQL(expr any) (string, []any, error) {
+func toSQL(expr any, sep string) (string, []any, error) {
 	switch t := expr.(type) {
 	case Expression:
 		return t.ToSQL()
+	case []Expression:
+		a := make([]any, 0, len(t))
+		for i := range t {
+			if t[i].Err != nil {
+				return "", nil, t[i].Err
+			}
+
+			if t[i].SQL == "" {
+				continue
+			}
+
+			a = append(a, t[i])
+		}
+
+		if sep == "" {
+			sep = ", "
+		}
+
+		return Join(sep, a...).ToSQL()
 	default:
 		return "?", []any{t}, nil
 	}
@@ -56,7 +75,7 @@ func (e Expression) ToSQL() (string, []any, error) {
 		b.WriteString(e.SQL[:index])
 		e.SQL = e.SQL[index+1:]
 
-		s, a, err := toSQL(e.Args[i])
+		s, a, err := toSQL(e.Args[i], ", ")
 		if err != nil {
 			return "", nil, err
 		}
@@ -112,7 +131,7 @@ func Join(sep string, expr ...any) Expression {
 	i := 0
 
 	for _, e := range expr {
-		s, a, err := toSQL(e)
+		s, a, err := toSQL(e, sep)
 		if err != nil {
 			return Expression{Err: err}
 		}

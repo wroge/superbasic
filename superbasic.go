@@ -16,37 +16,43 @@ type Sqlizer interface {
 
 var ErrInvalidNumberOfArguments = errors.New("invalid number of arguments")
 
+//nolint:cyclop
 func toSQL(expr any, sep string) (string, []any, error) {
-	switch t := expr.(type) {
+	switch exp := expr.(type) {
 	case Expression:
-		return t.ToSQL()
+		return exp.ToSQL()
 	case Sqlizer:
-		return t.ToSQL()
+		s, a, err := exp.ToSQL()
+		if err != nil {
+			return "", nil, fmt.Errorf("cannot resolve superbasic.Sqlizer: %w", err)
+		}
+
+		return s, a, nil
 	case Expr:
-		return t.Expression().ToSQL()
+		return exp.Expression().ToSQL()
 	case []Expression:
-		a := make([]any, len(t))
-		for i := range t {
-			a[i] = t[i]
+		a := make([]any, len(exp))
+		for i := range exp {
+			a[i] = exp[i]
 		}
 
 		return Join(sep, a...).ToSQL()
 	case []Sqlizer:
-		a := make([]any, len(t))
-		for i := range t {
-			a[i] = t[i]
+		a := make([]any, len(exp))
+		for i := range exp {
+			a[i] = exp[i]
 		}
 
 		return Join(sep, a...).ToSQL()
 	case []Expr:
-		a := make([]any, len(t))
-		for i := range t {
-			a[i] = t[i]
+		a := make([]any, len(exp))
+		for i := range exp {
+			a[i] = exp[i]
 		}
 
 		return Join(sep, a...).ToSQL()
 	default:
-		return "?", []any{t}, nil
+		return "?", []any{exp}, nil
 	}
 }
 
@@ -54,6 +60,7 @@ func SQL(sql string, args ...any) Expression {
 	return Expression{
 		SQL:  sql,
 		Args: args,
+		Err:  nil,
 	}
 }
 
@@ -68,86 +75,91 @@ func (e Expression) ToSQL() (string, []any, error) {
 		return "", nil, e.Err
 	}
 
-	b := &strings.Builder{}
-	args := make([]any, 0, len(e.Args))
+	build := &strings.Builder{}
+	arguments := make([]any, 0, len(e.Args))
 
-	i := -1
+	argIndex := -1
 
 	for {
 		index := strings.IndexRune(e.SQL, '?')
 		if index < 0 {
-			b.WriteString(e.SQL)
+			build.WriteString(e.SQL)
+
 			break
 		}
 
 		if index < len(e.SQL)-1 && e.SQL[index+1] == '?' {
-			b.WriteString(e.SQL[:index+2])
+			build.WriteString(e.SQL[:index+2])
 			e.SQL = e.SQL[index+2:]
+
 			continue
 		}
 
-		i++
+		argIndex++
 
-		if i >= len(e.Args) {
+		if argIndex >= len(e.Args) {
 			return "", nil, ErrInvalidNumberOfArguments
 		}
 
-		b.WriteString(e.SQL[:index])
+		build.WriteString(e.SQL[:index])
 		e.SQL = e.SQL[index+1:]
 
-		s, a, err := toSQL(e.Args[i], ", ")
+		sql, args, err := toSQL(e.Args[argIndex], ", ")
 		if err != nil {
 			return "", nil, err
 		}
 
-		if s == "" {
+		if sql == "" {
 			continue
 		}
 
-		b.WriteString(s)
-		args = append(args, a...)
+		build.WriteString(sql)
+
+		arguments = append(arguments, args...)
 	}
 
-	if i != len(e.Args)-1 {
+	if argIndex != len(e.Args)-1 {
 		return "", nil, ErrInvalidNumberOfArguments
 	}
 
-	return b.String(), args, nil
+	return build.String(), arguments, nil
 }
 
 func ToPostgres(expr any) (string, []any, error) {
-	s, a, err := toSQL(expr, ", ")
+	sql, args, err := toSQL(expr, ", ")
 	if err != nil {
 		return "", nil, err
 	}
 
-	b := &strings.Builder{}
-	i := -1
+	build := &strings.Builder{}
+	argIndex := -1
 
 	for {
-		index := strings.IndexRune(s, '?')
+		index := strings.IndexRune(sql, '?')
 		if index < 0 {
-			b.WriteString(s)
+			build.WriteString(sql)
+
 			break
 		}
 
-		if index < len(s)-1 && s[index+1] == '?' {
-			b.WriteString(s[:index+1])
-			s = s[index+2:]
+		if index < len(sql)-1 && sql[index+1] == '?' {
+			build.WriteString(sql[:index+1])
+			sql = sql[index+2:]
+
 			continue
 		}
 
-		i++
+		argIndex++
 
-		b.WriteString(fmt.Sprintf("%s$%d", s[:index], i+1))
-		s = s[index+1:]
+		build.WriteString(fmt.Sprintf("%s$%d", sql[:index], argIndex+1))
+		sql = sql[index+1:]
 	}
 
-	if i != len(a)-1 {
+	if argIndex != len(args)-1 {
 		return "", nil, ErrInvalidNumberOfArguments
 	}
 
-	return b.String(), a, nil
+	return build.String(), args, nil
 }
 
 func Join(sep string, expr ...any) Expression {
@@ -155,60 +167,62 @@ func Join(sep string, expr ...any) Expression {
 		return Append(expr...)
 	}
 
-	b := &strings.Builder{}
-	args := make([]any, 0, len(expr))
+	build := &strings.Builder{}
+	arguments := make([]any, 0, len(expr))
 
-	i := 0
+	argIndex := 0
 
 	for _, e := range expr {
-		s, a, err := toSQL(e, sep)
+		sql, args, err := toSQL(e, sep)
 		if err != nil {
-			return Expression{Err: err}
+			return Error(err)
 		}
 
-		if s == "" {
+		if sql == "" {
 			continue
 		}
 
-		if i != 0 {
-			b.WriteString(sep)
+		if argIndex != 0 {
+			build.WriteString(sep)
 		}
 
-		b.WriteString(s)
-		args = append(args, a...)
+		build.WriteString(sql)
 
-		i++
+		arguments = append(arguments, args...)
+
+		argIndex++
 	}
 
-	return SQL(b.String(), args...)
+	return SQL(build.String(), arguments...)
 }
 
 func Append(expr ...any) Expression {
-	b := &strings.Builder{}
-	args := make([]any, 0, len(expr))
+	build := &strings.Builder{}
+	arguments := make([]any, 0, len(expr))
 
 	for _, e := range expr {
-		s, a, err := toSQL(e, ", ")
+		sql, args, err := toSQL(e, ", ")
 		if err != nil {
-			return Expression{Err: err}
+			return Error(err)
 		}
 
-		if s == "" {
+		if sql == "" {
 			continue
 		}
 
-		b.WriteString(s)
-		args = append(args, a...)
+		build.WriteString(sql)
+
+		arguments = append(arguments, args...)
 	}
 
-	return SQL(b.String(), args...)
+	return SQL(build.String(), arguments...)
 }
 
 func If(condition bool, then any, els any) Expression {
 	if condition {
 		s, a, err := toSQL(then, ", ")
 		if err != nil {
-			return Expression{Err: err}
+			return Error(err)
 		}
 
 		return SQL(s, a...)
@@ -216,12 +230,16 @@ func If(condition bool, then any, els any) Expression {
 
 	s, a, err := toSQL(els, ", ")
 	if err != nil {
-		return Expression{Err: err}
+		return Error(err)
 	}
 
 	return SQL(s, a...)
 }
 
 func Skip() Expression {
-	return Expression{}
+	return SQL("")
+}
+
+func Error(err error) Expression {
+	return Expression{SQL: "", Args: nil, Err: err}
 }

@@ -142,5 +142,5 @@ table := superbasic.Table{
 }
 
 sql, err = table.ToDDL())
-// CREATE TABLE presidents (id SERIAL PRIMARY KEY, first TEXT NOT NULL, last TEXT NOT NULL, UNIQUE (first, last))
+// CREATE TABLE IF NOT EXISTS presidents (id SERIAL PRIMARY KEY, first TEXT NOT NULL, last TEXT NOT NULL, UNIQUE (first, last))
 ```

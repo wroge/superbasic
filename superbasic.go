@@ -7,11 +7,11 @@ import (
 )
 
 type Expr interface {
-	Expression() Expression
+	ToSQL() (string, []any, error)
 }
 
-type Sqlizer interface {
-	ToSQL() (string, []any, error)
+type ExprDDL interface {
+	ToDDL() (string, error)
 }
 
 var ErrInvalidNumberOfArguments = errors.New("invalid number of arguments")
@@ -21,15 +21,13 @@ func toSQL(expr any, sep string) (string, []any, error) {
 	switch exp := expr.(type) {
 	case Expression:
 		return exp.ToSQL()
-	case Sqlizer:
+	case Expr:
 		s, a, err := exp.ToSQL()
 		if err != nil {
-			return "", nil, fmt.Errorf("cannot resolve superbasic.Sqlizer: %w", err)
+			return "", nil, fmt.Errorf("cannot resolve superbasic.Expr: %w", err)
 		}
 
 		return s, a, nil
-	case Expr:
-		return exp.Expression().ToSQL()
 	case []Expression:
 		a := make([]any, len(exp))
 		for i := range exp {
@@ -37,14 +35,18 @@ func toSQL(expr any, sep string) (string, []any, error) {
 		}
 
 		return Join(sep, a...).ToSQL()
-	case []Sqlizer:
+	case []Expr:
 		a := make([]any, len(exp))
 		for i := range exp {
 			a[i] = exp[i]
 		}
 
 		return Join(sep, a...).ToSQL()
-	case []Expr:
+	case ExprDDL:
+		s, err := exp.ToDDL()
+
+		return s, nil, fmt.Errorf("cannot resolve superbasic.ExprDDL: %w", err)
+	case []ExprDDL:
 		a := make([]any, len(exp))
 		for i := range exp {
 			a[i] = exp[i]
@@ -68,6 +70,19 @@ type Expression struct {
 	SQL  string
 	Args []any
 	Err  error
+}
+
+func (e Expression) ToDDL() (string, error) {
+	sql, args, err := e.ToSQL()
+	if err != nil {
+		return "", err
+	}
+
+	if len(args) > 0 {
+		return "", ErrInvalidNumberOfArguments
+	}
+
+	return sql, nil
 }
 
 func (e Expression) ToSQL() (string, []any, error) {
@@ -242,4 +257,110 @@ func Skip() Expression {
 
 func Error(err error) Expression {
 	return Expression{SQL: "", Args: nil, Err: err}
+}
+
+type Select struct {
+	Distinct bool
+	Columns  []Expr
+	From     []Expr
+	Joins    []Expr
+	Where    Expr
+	GroupBy  []Expr
+	Having   Expr
+	OrderBy  []Expr
+	Limit    uint64
+	Offset   uint64
+}
+
+func (s Select) ToSQL() (string, []any, error) {
+	return Append(
+		SQL("SELECT "),
+		If(s.Distinct, SQL("DISTINCT "), Skip()),
+		If(len(s.Columns) > 0, s.Columns, SQL("*")),
+		If(len(s.From) > 0, SQL(" FROM ?", s.From), Skip()),
+		If(len(s.Joins) > 0, SQL(" ?", s.Joins), Skip()),
+		If(s.Where != nil, SQL(" WHERE ?", s.Where), Skip()),
+		If(len(s.GroupBy) > 0, SQL(" GROUP BY ?", s.GroupBy), Skip()),
+		If(s.Having != nil, SQL(" HAVING ?", s.Having), Skip()),
+		If(len(s.OrderBy) > 0, SQL(" ORDER BY ?", s.OrderBy), Skip()),
+		If(s.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", s.Limit)), Skip()),
+		If(s.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", s.Offset)), Skip()),
+	).ToSQL()
+}
+
+func Values(data ...[]any) Expression {
+	values := make([]Expression, len(data))
+
+	for j, d := range data {
+		values[j] = SQL("(?)", Join(", ", d...))
+	}
+
+	return SQL("?", values)
+}
+
+type Insert struct {
+	Into    string
+	Columns []string
+	Values  [][]any
+}
+
+func (i Insert) ToSQL() (string, []any, error) {
+	return Append(
+		SQL(fmt.Sprintf("INSERT INTO %s ", i.Into)),
+		If(len(i.Columns) > 0, SQL(fmt.Sprintf("(%s) ", strings.Join(i.Columns, ", "))), Skip()),
+		SQL("VALUES ?", Values(i.Values...)),
+	).ToSQL()
+}
+
+type Update struct {
+	Table string
+	Set   []Expr
+	Where Expr
+}
+
+func (u Update) ToSQL() (string, []any, error) {
+	return Append(
+		SQL(fmt.Sprintf("UPDATE %s SET ?", u.Table), u.Set),
+		If(u.Where != nil, SQL(" WHERE ?", u.Where), Skip()),
+	).ToSQL()
+}
+
+type Delete struct {
+	From  string
+	Where Expr
+}
+
+func (d Delete) ToSQL() (string, []any, error) {
+	return Append(
+		SQL(fmt.Sprintf("DELETE FROM %s", d.From)),
+		If(d.Where != nil, SQL(" WHERE ?", d.Where), Skip()),
+	).ToSQL()
+}
+
+type Table struct {
+	IfNotExists bool
+	Name        string
+	Columns     []ExprDDL
+	Constraints []ExprDDL
+}
+
+func (ct Table) ToDDL() (string, error) {
+	return Append(
+		SQL("CREATE TABLE"),
+		If(ct.IfNotExists, SQL(" IF NOT EXISTS"), Skip()),
+		SQL(fmt.Sprintf(" %s (?)", ct.Name), Join(", ", append(ct.Columns, ct.Constraints...))),
+	).ToDDL()
+}
+
+type Column struct {
+	Name        string
+	Type        string
+	Constraints []ExprDDL
+}
+
+func (cs Column) ToDDL() (string, error) {
+	return Append(
+		SQL(fmt.Sprintf("%s %s", cs.Name, cs.Type)),
+		If(len(cs.Constraints) > 0, SQL(" ?", cs.Constraints), Skip()),
+	).ToDDL()
 }

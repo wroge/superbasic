@@ -1,8 +1,10 @@
 # The superbasic SQL-Builder
 
+[![Build Status](https://img.shields.io/travis/wroge/superbasic/master)](https://travis-ci.org/wroge/superbasic)
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/wroge/superbasic)
 [![Go Report Card](https://goreportcard.com/badge/github.com/wroge/superbasic)](https://goreportcard.com/report/github.com/wroge/superbasic)
 ![golangci-lint](https://github.com/wroge/superbasic/workflows/golangci-lint/badge.svg)
+[![Codecov](https://img.shields.io/codecov/c/gh/wroge/superbasic)](https://codecov.io/gh/wroge/superbasic)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/superbasic.svg?style=social)](https://github.com/wroge/superbasic/tags)
 
 ```go get github.com/wroge/superbasic``` and use a super-simple SQL builder consisting of the 4 basic functions ```SQL(sql, expr...)```, ```Append(expr...)```, ```Join(sep, expr...)``` and ```If(condition, then, else)```.

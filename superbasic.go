@@ -236,7 +236,20 @@ func Append(expr ...any) Expression {
 	return SQL(build.String(), arguments...)
 }
 
-func If(condition bool, then any, els any) Expression {
+func If(condition bool, then any) Expression {
+	if condition {
+		s, a, err := toSQL(then, ", ")
+		if err != nil {
+			return Error(err)
+		}
+
+		return SQL(s, a...)
+	}
+
+	return SQL("")
+}
+
+func IfElse(condition bool, then any, els any) Expression {
 	if condition {
 		s, a, err := toSQL(then, ", ")
 		if err != nil {
@@ -252,10 +265,6 @@ func If(condition bool, then any, els any) Expression {
 	}
 
 	return SQL(s, a...)
-}
-
-func Skip() Expression {
-	return SQL("")
 }
 
 func Error(err error) Expression {
@@ -278,16 +287,16 @@ type Select struct {
 func (s Select) ToSQL() (string, []any, error) {
 	return Append(
 		SQL("SELECT "),
-		If(s.Distinct, SQL("DISTINCT "), Skip()),
-		If(len(s.Columns) > 0, s.Columns, SQL("*")),
-		If(len(s.From) > 0, SQL(" FROM ?", s.From), Skip()),
-		If(len(s.Joins) > 0, SQL(" ?", s.Joins), Skip()),
-		If(s.Where != nil, SQL(" WHERE ?", s.Where), Skip()),
-		If(len(s.GroupBy) > 0, SQL(" GROUP BY ?", s.GroupBy), Skip()),
-		If(s.Having != nil, SQL(" HAVING ?", s.Having), Skip()),
-		If(len(s.OrderBy) > 0, SQL(" ORDER BY ?", s.OrderBy), Skip()),
-		If(s.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", s.Limit)), Skip()),
-		If(s.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", s.Offset)), Skip()),
+		If(s.Distinct, SQL("DISTINCT ")),
+		IfElse(len(s.Columns) > 0, s.Columns, SQL("*")),
+		If(len(s.From) > 0, SQL(" FROM ?", s.From)),
+		If(len(s.Joins) > 0, SQL(" ?", s.Joins)),
+		If(s.Where != nil, SQL(" WHERE ?", s.Where)),
+		If(len(s.GroupBy) > 0, SQL(" GROUP BY ?", s.GroupBy)),
+		If(s.Having != nil, SQL(" HAVING ?", s.Having)),
+		If(len(s.OrderBy) > 0, SQL(" ORDER BY ?", s.OrderBy)),
+		If(s.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", s.Limit))),
+		If(s.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", s.Offset))),
 	).ToSQL()
 }
 
@@ -310,7 +319,7 @@ type Insert struct {
 func (i Insert) ToSQL() (string, []any, error) {
 	return Append(
 		SQL(fmt.Sprintf("INSERT INTO %s ", i.Into)),
-		If(len(i.Columns) > 0, SQL(fmt.Sprintf("(%s) ", strings.Join(i.Columns, ", "))), Skip()),
+		If(len(i.Columns) > 0, SQL(fmt.Sprintf("(%s) ", strings.Join(i.Columns, ", ")))),
 		SQL("VALUES ?", Values(i.Values...)),
 	).ToSQL()
 }
@@ -324,7 +333,7 @@ type Update struct {
 func (u Update) ToSQL() (string, []any, error) {
 	return Append(
 		SQL(fmt.Sprintf("UPDATE %s SET ?", u.Table), u.Set),
-		If(u.Where != nil, SQL(" WHERE ?", u.Where), Skip()),
+		If(u.Where != nil, SQL(" WHERE ?", u.Where)),
 	).ToSQL()
 }
 
@@ -336,7 +345,7 @@ type Delete struct {
 func (d Delete) ToSQL() (string, []any, error) {
 	return Append(
 		SQL(fmt.Sprintf("DELETE FROM %s", d.From)),
-		If(d.Where != nil, SQL(" WHERE ?", d.Where), Skip()),
+		If(d.Where != nil, SQL(" WHERE ?", d.Where)),
 	).ToSQL()
 }
 
@@ -350,7 +359,7 @@ type Table struct {
 func (ct Table) ToDDL() (string, error) {
 	return Append(
 		SQL("CREATE TABLE"),
-		If(ct.IfNotExists, SQL(" IF NOT EXISTS"), Skip()),
+		If(ct.IfNotExists, SQL(" IF NOT EXISTS")),
 		SQL(fmt.Sprintf(" %s (?)", ct.Name), Join(", ", append(ct.Columns, ct.Constraints...))),
 	).ToDDL()
 }
@@ -364,6 +373,6 @@ type Column struct {
 func (cs Column) ToDDL() (string, error) {
 	return Append(
 		SQL(fmt.Sprintf("%s %s", cs.Name, cs.Type)),
-		If(len(cs.Constraints) > 0, SQL(" ?", cs.Constraints), Skip()),
+		If(len(cs.Constraints) > 0, SQL(" ?", cs.Constraints)),
 	).ToDDL()
 }

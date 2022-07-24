@@ -17,18 +17,17 @@ go get github.com/wroge/superbasic
 The base building-blocks are
 ```superbasic.SQL(sql, expr...)```,
 ```superbasic.Append(expr...)```,
-```superbasic.Join(sep, expr...)``` and
-```superbasic.If(condition, then, else)```.
-All further expressions are based on these four functions.
-As the name suggests ```superbasic.Skip``` can be used to skip expressions, 
-which is useful in ```superbasic.If``` conditions.
+```superbasic.Join(sep, expr...)```,
+```superbasic.If(condition, then)``` and
+```superbasic.IfElse(condition, then, else)```
+All further expressions are based on these functions.
 
 ```go
 search := "biden"
 
 sql, args, err := superbasic.Append(
 	superbasic.SQL("SELECT id, first, last FROM presidents"),
-	superbasic.If(search != "", superbasic.SQL(" WHERE last = ?", search), superbasic.Skip()),
+	superbasic.If(search != "", superbasic.SQL(" WHERE last = ?", search)),
 ).ToSQL()
 // SELECT id, first, last FROM presidents WHERE last = ? [Biden] <nil>
 ```
@@ -115,16 +114,16 @@ type Select struct {
 func (s Select) ToSQL() (string, []any, error) {
 	return Append(
 		SQL("SELECT "),
-		If(s.Distinct, SQL("DISTINCT "), Skip()),
-		If(len(s.Columns) > 0, s.Columns, SQL("*")),
-		If(len(s.From) > 0, SQL(" FROM ?", s.From), Skip()),
-		If(len(s.Joins) > 0, SQL(" ?", s.Joins), Skip()),
-		If(s.Where != nil, SQL(" WHERE ?", s.Where), Skip()),
-		If(len(s.GroupBy) > 0, SQL(" GROUP BY ?", s.GroupBy), Skip()),
-		If(s.Having != nil, SQL(" HAVING ?", s.Having), Skip()),
-		If(len(s.OrderBy) > 0, SQL(" ORDER BY ?", s.OrderBy), Skip()),
-		If(s.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", s.Limit)), Skip()),
-		If(s.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", s.Offset)), Skip()),
+		If(s.Distinct, SQL("DISTINCT ")),
+		IfElse(len(s.Columns) > 0, s.Columns, SQL("*")),
+		If(len(s.From) > 0, SQL(" FROM ?", s.From)),
+		If(len(s.Joins) > 0, SQL(" ?", s.Joins)),
+		If(s.Where != nil, SQL(" WHERE ?", s.Where)),
+		If(len(s.GroupBy) > 0, SQL(" GROUP BY ?", s.GroupBy)),
+		If(s.Having != nil, SQL(" HAVING ?", s.Having)),
+		If(len(s.OrderBy) > 0, SQL(" ORDER BY ?", s.OrderBy)),
+		If(s.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", s.Limit))),
+		If(s.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", s.Offset))),
 	).ToSQL()
 }
 ```

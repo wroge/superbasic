@@ -1,6 +1,5 @@
 # The superbasic SQL-Builder
 
-[![Build Status](https://img.shields.io/travis/wroge/superbasic/master)](https://travis-ci.org/wroge/superbasic)
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/wroge/superbasic)
 [![Go Report Card](https://goreportcard.com/badge/github.com/wroge/superbasic)](https://goreportcard.com/report/github.com/wroge/superbasic)
 ![golangci-lint](https://github.com/wroge/superbasic/workflows/golangci-lint/badge.svg)

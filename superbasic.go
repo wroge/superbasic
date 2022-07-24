@@ -44,8 +44,11 @@ func toSQL(expr any, sep string) (string, []any, error) {
 		return Join(sep, a...).ToSQL()
 	case ExprDDL:
 		s, err := exp.ToDDL()
+		if err != nil {
+			return "", nil, fmt.Errorf("cannot resolve superbasic.ExprDDL: %w", err)
+		}
 
-		return s, nil, fmt.Errorf("cannot resolve superbasic.ExprDDL: %w", err)
+		return s, nil, nil
 	case []ExprDDL:
 		a := make([]any, len(exp))
 		for i := range exp {

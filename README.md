@@ -33,62 +33,62 @@ There is a ```ToPostgres``` function to translate expressions for Postgres datab
 
 ```go
 type Select struct {
- Columns []superbasic.Sqlizer
- From    superbasic.Sqlizer
- Where   []superbasic.Sqlizer
+	Columns []superbasic.Sqlizer
+	From    superbasic.Sqlizer
+	Where   []superbasic.Sqlizer
 }
 
 func (s Select) Expression() superbasic.Expression {
- return superbasic.Append(
-  superbasic.SQL("SELECT "),
-  superbasic.If(len(s.Columns) > 0, s.Columns, superbasic.SQL("*")),
-  superbasic.If(s.From != nil, superbasic.SQL(" FROM ?", s.From), superbasic.Skip()),
-  superbasic.If(len(s.Where) > 0,
-   superbasic.SQL(" WHERE ?",
-    superbasic.If(len(s.Where) > 1,
-     superbasic.Join(" AND ", s.Where),
-     s.Where,
-    ),
-   ),
-   superbasic.Skip(),
-  ),
- )
+	return superbasic.Append(
+		superbasic.SQL("SELECT "),
+		superbasic.If(len(s.Columns) > 0, s.Columns, superbasic.SQL("*")),
+		superbasic.If(s.From != nil, superbasic.SQL(" FROM ?", s.From), superbasic.Skip()),
+		superbasic.If(len(s.Where) > 0,
+			superbasic.SQL(" WHERE ?",
+				superbasic.If(len(s.Where) > 1,
+					superbasic.Join(" AND ", s.Where),
+					s.Where,
+				),
+			),
+			superbasic.Skip(),
+		),
+	)
 }
 
 func main() {
- query := Select{
-  Columns: []superbasic.Sqlizer{
-   superbasic.SQL("id"),
-   superbasic.SQL("first"),
-   superbasic.SQL("last"),
-  },
-  From: superbasic.SQL("presidents"),
-  Where: []superbasic.Sqlizer{
-   superbasic.SQL("last = ?", "Bush"),
-  },
- }
+	query := Select{
+		Columns: []superbasic.Sqlizer{
+			superbasic.SQL("id"),
+			superbasic.SQL("first"),
+			superbasic.SQL("last"),
+		},
+		From: superbasic.SQL("presidents"),
+		Where: []superbasic.Sqlizer{
+			superbasic.SQL("last = ?", "Bush"),
+		},
+	}
 
- fmt.Println(superbasic.ToPostgres(query))
- // SELECT id, first, last FROM presidents WHERE last = $1 [Bush]
+	fmt.Println(superbasic.ToPostgres(query))
+	// SELECT id, first, last FROM presidents WHERE last = $1 [Bush]
 
- query = Select{
-  Columns: []superbasic.Sqlizer{},
-  From:    superbasic.SQL("presidents"),
-  Where: []superbasic.Sqlizer{
-   superbasic.SQL("last = ?", "Bush"),
-   superbasic.SQL("first = ?", "Joe"),
-  },
- }
+	query = Select{
+		Columns: []superbasic.Sqlizer{},
+		From:    superbasic.SQL("presidents"),
+		Where: []superbasic.Sqlizer{
+			superbasic.SQL("last = ?", "Bush"),
+			superbasic.SQL("first = ?", "Joe"),
+		},
+	}
 
- fmt.Println(superbasic.ToPostgres(query))
- // SELECT * FROM presidents WHERE last = $1 AND first = $2 [Bush Joe]
+	fmt.Println(superbasic.ToPostgres(query))
+	// SELECT * FROM presidents WHERE last = $1 AND first = $2 [Bush Joe]
 
- query = Select{
-  From: superbasic.SQL("presidents"),
- }
+	query = Select{
+		From: superbasic.SQL("presidents"),
+	}
 
- fmt.Println(superbasic.ToPostgres(query))
- // SELECT * FROM presidents []
+	fmt.Println(superbasic.ToPostgres(query))
+	// SELECT * FROM presidents []
 }
 ```
 

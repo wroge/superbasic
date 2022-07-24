@@ -1,12 +1,14 @@
 name: codecov
-
 on:
   push:
-    branches: ["main"]
+    tags:
+      - v*
+    branches:
+      - master
+      - main
   pull_request:
-    branches: ["main"]
-  workflow_dispatch:
-
+permissions:
+  contents: read
 jobs:
   codecov:
     name: codecov

@@ -6,7 +6,7 @@
 [![codecov](https://codecov.io/gh/wroge/superbasic/branch/main/graph/badge.svg?token=SBSedMOGHR)](https://codecov.io/gh/wroge/superbasic)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/superbasic.svg?style=social)](https://github.com/wroge/superbasic/tags)
 
-This package provides utilities to build secure SQL queries. 
+This package provides utilities to build complex and dynamic but secure SQL queries.
 
 ```go
 go get github.com/wroge/superbasic

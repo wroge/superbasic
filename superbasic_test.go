@@ -30,6 +30,8 @@ func (s Select) Expression() superbasic.Expression {
 }
 
 func TestSelect(t *testing.T) {
+	t.Parallel()
+
 	query := Select{
 		Columns: []superbasic.Sqlizer{
 			superbasic.SQL("id"),

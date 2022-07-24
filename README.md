@@ -69,6 +69,31 @@ sql, args, err = superbasic.ToPostgres(query)
 // [Bush Joe]
 ```
 
+All expressions can, of course, be nested within each other to produce new expressions. 
+The ```superbasic.Insert``` example shows how to append the Postgres-specific expression ```RETURNING id```.
+
+```go
+insert := superbasic.Append(
+	superbasic.Insert{
+		Into:    "presidents",
+		Columns: []string{"first", "last"},
+		Values: [][]any{
+			{"Joe", "Bden"},
+			{"Donald", "Trump"},
+			{"Barack", "Obama"},
+			{"George W.", "Bush"},
+			{"Bill", "Clinton"},
+			{"George H. W.", "Bush"},
+		},
+	},
+	superbasic.SQL(" RETURNING id"),
+)
+
+sql, args, err := superbasic.ToPostgres(insert)
+// INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12) RETURNING id 
+// [Joe Bden Donald Trump Barack Obama George W. Bush Bill Clinton George H. W. Bush]
+```
+
 ## Customized Expressions 
 
 The next section shows the ```superbasic.Select``` expression. Here you can see how easy it is to create your own expressions.

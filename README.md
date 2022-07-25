@@ -93,6 +93,21 @@ sql, args, err := superbasic.ToPostgres(insert)
 // [Joe Bden Donald Trump Barack Obama George W. Bush Bill Clinton George H. W. Bush]
 ```
 
+If you prefer to write the SQL queries yourself, you are of course welcome to do so.
+
+```go
+sql, args, err := superbasic.SQL("INSERT INTO presidents (first, last) VALUES ? RETURNING id", superbasic.Values(
+	[]any{"Joe", "Bden"},
+	[]any{"Donald", "Trump"},
+	[]any{"Barack", "Obama"},
+	[]any{"George W.", "Bush"},
+	[]any{"Bill", "Clinton"},
+	[]any{"George H. W.", "Bush"},
+)).ToSQL()
+// INSERT INTO presidents (first, last) VALUES (?, ?), (?, ?), (?, ?), (?, ?), (?, ?), (?, ?) RETURNING id 
+// [Joe Bden Donald Trump Barack Obama George W. Bush Bill Clinton George H. W. Bush]
+```
+
 ## Customized Expressions 
 
 The next section shows the ```superbasic.Select``` expression. Here you can see how easy it is to create your own expressions.

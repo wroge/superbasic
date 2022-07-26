@@ -21,24 +21,10 @@ func TestTable(t *testing.T) {
 					superbasic.SQL("PRIMARY KEY"),
 				},
 			},
-			superbasic.Column{
-				Name: "first",
-				Type: "TEXT",
-				Constraints: []superbasic.Sqlizer{
-					superbasic.SQL("NOT NULL"),
-				},
-			},
-			superbasic.Column{
-				Name: "last",
-				Type: "TEXT",
-				Constraints: []superbasic.Sqlizer{
-					superbasic.SQL("NOT NULL"),
-				},
-			},
+			superbasic.SQL("first TEXT NOT NULL"),
+			superbasic.SQL("last TEXT NOT NULL"),
 		},
-		Constraints: []superbasic.Sqlizer{
-			superbasic.SQL("UNIQUE (first, last)"),
-		},
+		Constraints: superbasic.SQL("UNIQUE (first, last)"),
 	}
 
 	sql, err := superbasic.ToDDL(table)
@@ -130,23 +116,15 @@ func TestInsert(t *testing.T) {
 func TestSelect(t *testing.T) {
 	t.Parallel()
 
-	joe := "Joe"
-
-	query := superbasic.Select{
-		Columns: []superbasic.Sqlizer{
-			superbasic.SQL("id"),
-			superbasic.SQL("first"),
-			superbasic.SQL("last"),
-		},
-		From: []superbasic.Sqlizer{
-			superbasic.SQL("presidents"),
-		},
-		Where: superbasic.SQL("? OR ?",
-			superbasic.SQL("last = ?", "Bush"), superbasic.SQL("first = ?", joe)),
-		OrderBy: []superbasic.Sqlizer{
-			superbasic.SQL("last"),
-		},
-		Limit: 3,
+	query := superbasic.Query{
+		Select: superbasic.SQL("p.id, p.first, p.last"),
+		From:   superbasic.SQL("presidents AS p"),
+		Where: superbasic.And(
+			superbasic.Equals("p.last", "Bush"),
+			superbasic.NotEquals("p.first", "George W."),
+		),
+		OrderBy: superbasic.SQL("p.last"),
+		Limit:   3,
 	}
 
 	sql, args, err := superbasic.ToPostgres(query)
@@ -154,8 +132,9 @@ func TestSelect(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "SELECT id, first, last FROM presidents WHERE last = $1 OR first = $2 ORDER BY last LIMIT 3" ||
-		len(args) != 2 || args[0] != "Bush" || args[1] != joe {
+	if sql != "SELECT p.id, p.first, p.last FROM presidents AS p"+
+		" WHERE p.last = $1 AND p.first <> $2 ORDER BY p.last LIMIT 3" ||
+		len(args) != 2 || args[0] != "Bush" || args[1] != "George W." {
 		t.Fatal(sql, args)
 	}
 }

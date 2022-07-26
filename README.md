@@ -37,35 +37,38 @@ sql, args, err := superbasic.Append(
 Expressions within the arguments, like ```superbasic.Expression``` or ```superbasic.Sqlizer```, are recognized and handled accordingly. Unknown arguments are built into the expression using placeholders. Slices of expressions, like ```[]superbasic.Expression```, are joined by the separator in the ```superbasic.Join``` expression or by ```", "``` in all other cases.
 
 ```go 
-sql, args, err = superbasic.SQL("SELECT ? FROM presidents", []superbasic.Expression{superbasic.SQL("first"), superbasic.SQL("last")}).ToSQL()
+sql, args, err = superbasic.SQL("SELECT ? FROM presidents", 
+	[]superbasic.Expression{superbasic.SQL("first"), superbasic.SQL("last")}).ToSQL()
 // SELECT first, last FROM presidents
 ```
 
 ## Build-in Queries
 
-In addition, there are expressions, such as ```superbasic.Select``` or ```superbasic.Insert```, that allow you to build the queries even more easily. This example shows a query where the resulting sql expression is translated into Postgres format.
+In addition, there are expressions, such as ```superbasic.Query``` or ```superbasic.Insert```, that allow you to build the queries even more easily. Sometimes it is more readable to use the helper functions like ```superbasic.And```and
+```superbasic.Equals```, therefore this library also offers an increasing amount of utility-functions.
+
+This example shows a query where the resulting sql expression is translated into Postgres format.
 
 ```go
-query := superbasic.Select{
-	Columns: []superbasic.Sqlizer{
-		superbasic.SQL("id"),
-		superbasic.SQL("first"),
-		superbasic.SQL("last"),
-	},
-	From: []superbasic.Sqlizer{
-		superbasic.SQL("presidents"),
-	},
-	Where: superbasic.SQL("? OR ?",
-		superbasic.SQL("last = ?", "Bush"), superbasic.SQL("first = ?", "Joe")),
-	OrderBy: []superbasic.Sqlizer{
-		superbasic.SQL("last"),
-	},
-	Limit: 3,
+query := superbasic.Query{
+	Select: superbasic.SQL("p.id, p.first, p.last"),
+	From:   superbasic.SQL("presidents AS p"),
+	Where: superbasic.And(
+		superbasic.Equals("p.last", "Bush"),
+		superbasic.NotEquals("p.first", "George W."),
+	),
+	// Could also be written as:
+	// Where: superbasic.Join(" AND ",
+	// 		superbasic.SQL("p.last = ?", "Bush"),
+	// 		superbasic.SQL("p.first <> ?", "George W."),
+	// ),
+	OrderBy: superbasic.SQL("p.last"),
+	Limit:   3,
 }
 
 sql, args, err = superbasic.ToPostgres(query)
-// SELECT id, first, last FROM presidents WHERE last = $1 OR first = $2 ORDER BY last LIMIT 3
-// [Bush Joe]
+// SELECT p.id, p.first, p.last FROM presidents AS p WHERE p.last = $1 AND p.first <> $2 ORDER BY p.last LIMIT 3
+// [Bush George W.]
 ```
 
 All expressions can, of course, be nested within each other to produce new expressions. 
@@ -110,35 +113,30 @@ sql, args, err := superbasic.SQL("INSERT INTO presidents (first, last) VALUES ? 
 
 ## Customized Expressions 
 
-The next section shows the ```superbasic.Select``` expression. Here you can see how easy it is to create your own expressions.
+The next section shows the ```superbasic.Query``` expression. Here you can see how easy it is to create your own expressions.
 
 ```go
-type Select struct {
-	Distinct bool
-	Columns  []Sqlizer
-	From     []Sqlizer
-	Joins    []Sqlizer
-	Where    Sqlizer
-	GroupBy  []Sqlizer
-	Having   Sqlizer
-	OrderBy  []Sqlizer
-	Limit    uint64
-	Offset   uint64
+type Query struct {
+	Select  any
+	From    any
+	Where   any
+	GroupBy any
+	Having  any
+	OrderBy any
+	Limit   uint64
+	Offset  uint64
 }
 
-func (s Select) ToSQL() (string, []any, error) {
+func (q Query) ToSQL() (string, []any, error) {
 	return Append(
-		SQL("SELECT "),
-		If(s.Distinct, SQL("DISTINCT ")),
-		IfElse(len(s.Columns) > 0, s.Columns, SQL("*")),
-		If(len(s.From) > 0, SQL(" FROM ?", s.From)),
-		If(len(s.Joins) > 0, SQL(" ?", s.Joins)),
-		If(s.Where != nil, SQL(" WHERE ?", s.Where)),
-		If(len(s.GroupBy) > 0, SQL(" GROUP BY ?", s.GroupBy)),
-		If(s.Having != nil, SQL(" HAVING ?", s.Having)),
-		If(len(s.OrderBy) > 0, SQL(" ORDER BY ?", s.OrderBy)),
-		If(s.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", s.Limit))),
-		If(s.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", s.Offset))),
+		SQL("SELECT ?", IfElse(q.Select != nil, q.Select, SQL("*"))),
+		If(q.From != nil, SQL(" FROM ?", q.From)),
+		If(q.Where != nil, SQL(" WHERE ?", q.Where)),
+		If(q.GroupBy != nil, SQL(" GROUP BY ?", q.GroupBy)),
+		If(q.Having != nil, SQL(" HAVING ?", q.Having)),
+		If(q.OrderBy != nil, SQL(" ORDER BY ?", q.OrderBy)),
+		If(q.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", q.Limit))),
+		If(q.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", q.Offset))),
 	).ToSQL()
 }
 ```
@@ -159,24 +157,10 @@ table := superbasic.Table{
 				superbasic.SQL("PRIMARY KEY"),
 			},
 		},
-		superbasic.Column{
-			Name: "first",
-			Type: "TEXT",
-			Constraints: []superbasic.Sqlizer{
-				superbasic.SQL("NOT NULL"),
-			},
-		},
-		superbasic.Column{
-			Name: "last",
-			Type: "TEXT",
-			Constraints: []superbasic.Sqlizer{
-				superbasic.SQL("NOT NULL"),
-			},
-		},
+		superbasic.SQL("first TEXT NOT NULL"),
+		superbasic.SQL("last TEXT NOT NULL"),
 	},
-	Constraints: []superbasic.Sqlizer{
-		superbasic.SQL("UNIQUE (first, last)"),
-	},
+	Constraints: superbasic.SQL("UNIQUE (first, last)"),
 }
 
 sql, err := superbasic.ToDDL(table)

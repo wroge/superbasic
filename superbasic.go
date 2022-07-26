@@ -53,7 +53,7 @@ func (e Expression) ToSQL() (string, []any, error) {
 		builder.WriteString(e.SQL[:index])
 		e.SQL = e.SQL[index+1:]
 
-		sql, args, err := ToSQL(e.Args[argsIndex])
+		sql, args, err := toSQL(e.Args[argsIndex], ", ")
 		if err != nil {
 			return "", nil, err
 		}
@@ -83,13 +83,17 @@ func Error(err error) Expression {
 }
 
 func Join(sep string, expr ...any) Expression {
+	if len(expr) == 0 {
+		return SQL("")
+	}
+
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(expr))
 
 	isFirst := true
 
 	for _, e := range expr {
-		sql, args, err := ToSQL(e)
+		sql, args, err := toSQL(e, sep)
 		if err != nil {
 			return Expression{Err: err}
 		}
@@ -132,33 +136,64 @@ func IfElse(cond bool, then any, els any) Expression {
 	return SQL("?", els)
 }
 
-type Select struct {
-	Distinct bool
-	Columns  []Sqlizer
-	From     []Sqlizer
-	Joins    []Sqlizer
-	Where    Sqlizer
-	GroupBy  []Sqlizer
-	Having   Sqlizer
-	OrderBy  []Sqlizer
-	Limit    uint64
-	Offset   uint64
+type Query struct {
+	Select  any
+	From    any
+	Where   any
+	GroupBy any
+	Having  any
+	OrderBy any
+	Limit   uint64
+	Offset  uint64
 }
 
-func (s Select) ToSQL() (string, []any, error) {
+func (q Query) ToSQL() (string, []any, error) {
 	return Append(
-		SQL("SELECT "),
-		If(s.Distinct, SQL("DISTINCT ")),
-		IfElse(len(s.Columns) > 0, s.Columns, SQL("*")),
-		If(len(s.From) > 0, SQL(" FROM ?", s.From)),
-		If(len(s.Joins) > 0, SQL(" ?", s.Joins)),
-		If(s.Where != nil, SQL(" WHERE ?", s.Where)),
-		If(len(s.GroupBy) > 0, SQL(" GROUP BY ?", s.GroupBy)),
-		If(s.Having != nil, SQL(" HAVING ?", s.Having)),
-		If(len(s.OrderBy) > 0, SQL(" ORDER BY ?", s.OrderBy)),
-		If(s.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", s.Limit))),
-		If(s.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", s.Offset))),
+		SQL("SELECT ?", IfElse(q.Select != nil, q.Select, SQL("*"))),
+		If(q.From != nil, SQL(" FROM ?", q.From)),
+		If(q.Where != nil, SQL(" WHERE ?", q.Where)),
+		If(q.GroupBy != nil, SQL(" GROUP BY ?", q.GroupBy)),
+		If(q.Having != nil, SQL(" HAVING ?", q.Having)),
+		If(q.OrderBy != nil, SQL(" ORDER BY ?", q.OrderBy)),
+		If(q.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", q.Limit))),
+		If(q.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", q.Offset))),
 	).ToSQL()
+}
+
+func Or(left, right Sqlizer) Expression {
+	return SQL("(? OR ?)", left, right)
+}
+
+func And(expr ...Sqlizer) Expression {
+	return Join(" AND ", expr)
+}
+
+func Not(expr Sqlizer) Expression {
+	return SQL("NOT (?)", expr)
+}
+
+func Equals(ident string, value any) Expression {
+	return SQL(fmt.Sprintf("%s = ?", ident), value)
+}
+
+func NotEquals(ident string, value any) Expression {
+	return SQL(fmt.Sprintf("%s <> ?", ident), value)
+}
+
+func Greater(ident string, value any) Expression {
+	return SQL(fmt.Sprintf("%s > ?", ident), value)
+}
+
+func GreaterOrEquals(ident string, value any) Expression {
+	return SQL(fmt.Sprintf("%s >= ?", ident), value)
+}
+
+func Less(ident string, value any) Expression {
+	return SQL(fmt.Sprintf("%s < ?", ident), value)
+}
+
+func LessOrEquals(ident string, value any) Expression {
+	return SQL(fmt.Sprintf("%s <= ?", ident), value)
 }
 
 func Values(data ...[]any) Expression {
@@ -187,8 +222,8 @@ func (i Insert) ToSQL() (string, []any, error) {
 
 type Update struct {
 	Table string
-	Set   []Sqlizer
-	Where Sqlizer
+	Set   any
+	Where any
 }
 
 func (u Update) ToSQL() (string, []any, error) {
@@ -200,7 +235,7 @@ func (u Update) ToSQL() (string, []any, error) {
 
 type Delete struct {
 	From  string
-	Where Sqlizer
+	Where any
 }
 
 func (d Delete) ToSQL() (string, []any, error) {
@@ -213,32 +248,35 @@ func (d Delete) ToSQL() (string, []any, error) {
 type Table struct {
 	IfNotExists bool
 	Name        string
-	Columns     []Sqlizer
-	Constraints []Sqlizer
+	Columns     any
+	Constraints any
 }
 
 func (ct Table) ToSQL() (string, []any, error) {
 	return Append(
 		SQL("CREATE TABLE"),
 		If(ct.IfNotExists, SQL(" IF NOT EXISTS")),
-		SQL(fmt.Sprintf(" %s (?)", ct.Name), Join(", ", append(ct.Columns, ct.Constraints...))),
+		SQL(fmt.Sprintf(" %s (", ct.Name)),
+		Join(", ", ct.Columns),
+		If(ct.Constraints != nil, SQL(", ?", ct.Constraints)),
+		SQL(")"),
 	).ToSQL()
 }
 
 type Column struct {
 	Name        string
 	Type        string
-	Constraints []Sqlizer
+	Constraints any
 }
 
 func (cs Column) ToSQL() (string, []any, error) {
 	return Append(
 		SQL(fmt.Sprintf("%s %s", cs.Name, cs.Type)),
-		If(len(cs.Constraints) > 0, SQL(" ?", cs.Constraints)),
+		If(cs.Constraints != nil, SQL(" ?", Join(" ", cs.Constraints))),
 	).ToSQL()
 }
 
-func ToExpression(expr any) (Expression, bool) {
+func toExpression(expr any, sep string) (Expression, bool) {
 	switch expression := expr.(type) {
 	case Expression:
 		return expression, true
@@ -247,9 +285,17 @@ func ToExpression(expr any) (Expression, bool) {
 
 		return Expression{SQL: sql, Args: args, Err: err}, true
 	case []Expression:
-		return Join(", ", anySlice(expression)...), true
+		if len(expression) == 0 {
+			return SQL(""), true
+		}
+
+		return Join(sep, anySlice(expression)...), true
 	case []Sqlizer:
-		return Join(", ", anySlice(expression)...), true
+		if len(expression) == 0 {
+			return SQL(""), true
+		}
+
+		return Join(sep, anySlice(expression)...), true
 	default:
 		return Expression{}, false
 	}
@@ -265,8 +311,8 @@ func anySlice[T any](s []T) []any {
 	return out
 }
 
-func ToSQL(expr any) (string, []any, error) {
-	ex, ok := ToExpression(expr)
+func toSQL(expr any, sep string) (string, []any, error) {
+	ex, ok := toExpression(expr, sep)
 	if !ok {
 		return "?", []any{expr}, nil
 	}
@@ -275,7 +321,7 @@ func ToSQL(expr any) (string, []any, error) {
 }
 
 func ToDDL(expr any) (string, error) {
-	sql, args, err := ToSQL(expr)
+	sql, args, err := toSQL(expr, ", ")
 	if err != nil {
 		return "", err
 	}
@@ -321,7 +367,7 @@ func (b *Builder) Write(expr any) *Builder {
 		b.builder = &strings.Builder{}
 	}
 
-	sql, args, err := ToSQL(expr)
+	sql, args, err := toSQL(expr, ", ")
 	if err != nil {
 		b.err = err
 
@@ -339,7 +385,7 @@ func (b *Builder) WriteSQL(sql string, args ...any) *Builder {
 }
 
 func ToPostgres(expr any) (string, []any, error) {
-	sql, args, err := ToSQL(expr)
+	sql, args, err := toSQL(expr, ", ")
 	if err != nil {
 		return "", nil, err
 	}

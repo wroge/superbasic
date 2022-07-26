@@ -34,7 +34,7 @@ sql, args, err := superbasic.Append(
 
 ## Types and Interfaces
 
-Expressions within the arguments, like ```superbasic.Expression``` or ```superbasic.Expr```, are recognized and handled accordingly. Unknown arguments are built into the expression using placeholders. Slices of expressions, like ```[]superbasic.Expression```, are joined by the separator in the ```superbasic.Join``` expression or by ```", "``` in all other cases.
+Expressions within the arguments, like ```superbasic.Expression``` or ```superbasic.Sqlizer```, are recognized and handled accordingly. Unknown arguments are built into the expression using placeholders. Slices of expressions, like ```[]superbasic.Expression```, are joined by the separator in the ```superbasic.Join``` expression or by ```", "``` in all other cases.
 
 ```go 
 sql, args, err = superbasic.SQL("SELECT ? FROM presidents", []superbasic.Expression{superbasic.SQL("first"), superbasic.SQL("last")}).ToSQL()

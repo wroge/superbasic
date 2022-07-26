@@ -12,174 +12,62 @@ This package provides utilities to build complex and dynamic but secure SQL quer
 go get github.com/wroge/superbasic
 ```
 
-## Base Building-Blocks
-
-The base building-blocks are
-```superbasic.SQL(sql, expr...)```,
-```superbasic.Append(expr...)```,
-```superbasic.Join(sep, expr...)```,
-```superbasic.If(condition, then)``` and
-```superbasic.IfElse(condition, then, else)```
-All further expressions are based on these functions.
+Simply put, superbasic helps you write prepared statements, and is also a kind of template engine that compiles expressions.
 
 ```go
-search := "biden"
-
-sql, args, err := superbasic.Append(
-	superbasic.SQL("SELECT id, first, last FROM presidents"),
-	superbasic.If(search != "", superbasic.SQL(" WHERE last = ?", search)),
-).ToSQL()
-// SELECT id, first, last FROM presidents WHERE last = ? [Biden] <nil>
-```
-
-## Types and Interfaces
-
-Expressions within the arguments, like ```superbasic.Expression``` or ```superbasic.Sqlizer```, are recognized and handled accordingly. Unknown arguments are built into the expression using placeholders. Slices of expressions, like ```[]superbasic.Expression```, are joined by the separator in the ```superbasic.Join``` expression or by ```", "``` in all other cases.
-
-```go 
-sql, args, err = superbasic.SQL("SELECT ? FROM presidents", 
-	[]superbasic.Expression{superbasic.SQL("first"), superbasic.SQL("last")}).ToSQL()
-// SELECT first, last FROM presidents
-```
-
-## Build-in Queries
-
-In addition, there are expressions, such as ```superbasic.Query``` or ```superbasic.Insert```, that allow you to build the queries even more easily. Sometimes it is more readable to use the helper functions like ```superbasic.And```and
-```superbasic.Equals```, therefore this library also offers an increasing amount of utility-functions.
-
-This example shows a query where the resulting sql expression is translated into Postgres format.
-
-```go
-query := superbasic.Query{
-	Select: superbasic.SQL("p.id, p.first, p.last"),
-	From:   superbasic.SQL("presidents AS p"),
-	Where: superbasic.And(
-		superbasic.Equals("p.last", "Bush"),
-		superbasic.NotEquals("p.first", "George W."),
-	),
-	// Could also be written as:
-	// Where: superbasic.Join(" AND ",
-	// 		superbasic.SQL("p.last = ?", "Bush"),
-	// 		superbasic.SQL("p.first <> ?", "George W."),
-	// ),
-	OrderBy: superbasic.SQL("p.last"),
-	Limit:   3,
-}
-
-sql, args, err = superbasic.ToPostgres(query)
-// SELECT p.id, p.first, p.last FROM presidents AS p WHERE p.last = $1 AND p.first <> $2 ORDER BY p.last LIMIT 3
-// [Bush George W.]
-```
-
-All expressions can, of course, be nested within each other to produce new expressions. 
-The ```superbasic.Insert``` example shows how to append the Postgres-specific expression ```RETURNING id```.
-
-```go
-insert := superbasic.Append(
-	superbasic.Insert{
-		Into:    "presidents",
-		Columns: []string{"first", "last"},
-		Values: [][]any{
-			{"Joe", "Bden"},
-			{"Donald", "Trump"},
-			{"Barack", "Obama"},
-			{"George W.", "Bush"},
-			{"Bill", "Clinton"},
-			{"George H. W.", "Bush"},
-		},
+insert := superbasic.SQL("INSERT INTO presidents (?) VALUES ? RETURNING id",
+	superbasic.Columns{"first", "last"},
+	superbasic.Values{
+		{"Joe", "Biden"},
+		{"Donald", "trump"},
+		{"Barack", "Obama"},
+		{"George W.", "Bush"},
+		{"Bill", "Clinton"},
+		{"George H. W.", "Bush"},
 	},
-	superbasic.SQL(" RETURNING id"),
 )
 
-sql, args, err := superbasic.ToPostgres(insert)
+fmt.Println(superbasic.ToPostgres(insert))
 // INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12) RETURNING id 
-// [Joe Bden Donald Trump Barack Obama George W. Bush Bill Clinton George H. W. Bush]
-```
+// [Joe Biden Donald trump Barack Obama George W. Bush Bill Clinton George H. W. Bush]
 
-If you prefer to write the SQL queries yourself, you are of course welcome to do so.
+update := superbasic.SQL("UPDATE presidents SET last = ? WHERE ?",
+	"Trump",
+	superbasic.SQL("first = ?", "Donald"),
+)
 
-```go
-sql, args, err := superbasic.SQL("INSERT INTO presidents (first, last) VALUES ? RETURNING id", superbasic.Values(
-	[]any{"Joe", "Bden"},
-	[]any{"Donald", "Trump"},
-	[]any{"Barack", "Obama"},
-	[]any{"George W.", "Bush"},
-	[]any{"Bill", "Clinton"},
-	[]any{"George H. W.", "Bush"},
-)).ToSQL()
-// INSERT INTO presidents (first, last) VALUES (?, ?), (?, ?), (?, ?), (?, ?), (?, ?), (?, ?) RETURNING id 
-// [Joe Bden Donald Trump Barack Obama George W. Bush Bill Clinton George H. W. Bush]
-```
+fmt.Println(update.ToSQL())
+// UPDATE presidents SET last = ? WHERE first = ? [Trump Donald]
 
-## Customized Expressions 
+columns := []string{"id", "first", "last"}
+lastname := "Bush"
+sort := "first"
 
-The next section shows the ```superbasic.Query``` expression. Here you can see how easy it is to create your own expressions.
+query := superbasic.Append(
+	superbasic.SQL("SELECT ? FROM presidents", superbasic.Columns(columns)),
+	superbasic.If(lastname != "", superbasic.SQL(" WHERE last = ?", lastname)),
+	superbasic.If(sort != "", superbasic.SQL(" ORDER BY ?", superbasic.SQL(sort))),
+)
 
-```go
-type Query struct {
-	Select  any
-	From    any
-	Where   any
-	GroupBy any
-	Having  any
-	OrderBy any
-	Limit   uint64
-	Offset  uint64
-}
+fmt.Println(query.ToSQL())
+// SELECT id, first, last FROM presidents WHERE last = ? ORDER BY first [Bush]
 
-func (q Query) ToSQL() (string, []any, error) {
-	return Append(
-		SQL("SELECT ?", IfElse(q.Select != nil, q.Select, SQL("*"))),
-		If(q.From != nil, SQL(" FROM ?", q.From)),
-		If(q.Where != nil, SQL(" WHERE ?", q.Where)),
-		If(q.GroupBy != nil, SQL(" GROUP BY ?", q.GroupBy)),
-		If(q.Having != nil, SQL(" HAVING ?", q.Having)),
-		If(q.OrderBy != nil, SQL(" ORDER BY ?", q.OrderBy)),
-		If(q.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", q.Limit))),
-		If(q.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", q.Offset))),
-	).ToSQL()
-}
-```
+delete := superbasic.SQL("DELETE FROM presidents WHERE ?",
+	superbasic.Join(" AND ",
+		superbasic.SQL("last = ?", "Bush"),
+		superbasic.SQL("first = ?", "Joe"),
+	),
+)
 
-## DDL expressions
+fmt.Println(superbasic.ToPostgres(delete))
+// DELETE FROM presidents WHERE last = $1 AND first = $2 [Bush Joe]
 
-It is also possible to create DDL queries, for example using the predefined expression ```superbasic.Table```.
+builder := superbasic.NewBuilder().WriteSQL("SELECT ")
 
-```go
-table := superbasic.Table{
-	IfNotExists: true,
-	Name:        "presidents",
-	Columns: []superbasic.Sqlizer{
-		superbasic.Column{
-			Name: "id",
-			Type: "SERIAL",
-			Constraints: []superbasic.Sqlizer{
-				superbasic.SQL("PRIMARY KEY"),
-			},
-		},
-		superbasic.SQL("first TEXT NOT NULL"),
-		superbasic.SQL("last TEXT NOT NULL"),
-	},
-	Constraints: superbasic.SQL("UNIQUE (first, last)"),
-}
+builder.Write(superbasic.Columns(columns)).WriteSQL(" FROM presidents")
 
-sql, err := superbasic.ToDDL(table)
-// CREATE TABLE IF NOT EXISTS presidents (id SERIAL PRIMARY KEY, first TEXT NOT NULL, last TEXT NOT NULL, UNIQUE (first, last))
-```
+builder.Write(superbasic.SQL(" WHERE first IN (?, ?)", "Barack", "Donald"))
 
-## SQL Builder
-
-Of course, there is also a builder that can be used to create the SQL query. Here is an example:
-
-```go
-b := superbasic.NewBuilder()
-
-b.WriteSQL("SELECT ").WriteSQL("first, last")
-b.WriteSQL(" FROM presidents")
-b.WriteSQL(" WHERE ")
-b.Write(superbasic.Join(" OR ", superbasic.SQL("last = ?", "Bush"), superbasic.SQL("first = ?", "Joe")))
-
-sql, args, err := b.ToSQL()
-// SELECT first, last FROM presidents WHERE last = ? OR first = ? 
-// [Bush Joe]
+fmt.Println(builder.ToSQL())
+// SELECT id, first, last FROM presidents WHERE first IN (?, ?) [Barack Donald]
 ```

@@ -136,144 +136,26 @@ func IfElse(cond bool, then any, els any) Expression {
 	return SQL("?", els)
 }
 
-type Query struct {
-	Select  any
-	From    any
-	Where   any
-	GroupBy any
-	Having  any
-	OrderBy any
-	Limit   uint64
-	Offset  uint64
+type Columns []string
+
+func (i Columns) ToSQL() (string, []any, error) {
+	return strings.Join(i, ", "), nil, nil
 }
 
-func (q Query) ToSQL() (string, []any, error) {
-	return Append(
-		SQL("SELECT ?", IfElse(q.Select != nil, q.Select, SQL("*"))),
-		If(q.From != nil, SQL(" FROM ?", q.From)),
-		If(q.Where != nil, SQL(" WHERE ?", q.Where)),
-		If(q.GroupBy != nil, SQL(" GROUP BY ?", q.GroupBy)),
-		If(q.Having != nil, SQL(" HAVING ?", q.Having)),
-		If(q.OrderBy != nil, SQL(" ORDER BY ?", q.OrderBy)),
-		If(q.Limit > 0, SQL(fmt.Sprintf(" LIMIT %d", q.Limit))),
-		If(q.Offset > 0, SQL(fmt.Sprintf(" OFFSET %d", q.Offset))),
-	).ToSQL()
-}
+type Values [][]any
 
-func Or(left, right Sqlizer) Expression {
-	return SQL("(? OR ?)", left, right)
-}
+func (v Values) ToSQL() (string, []any, error) {
+	builder := NewBuilder()
 
-func And(expr ...Sqlizer) Expression {
-	return Join(" AND ", expr)
-}
+	for i, d := range v {
+		if i != 0 {
+			builder.WriteSQL(", ")
+		}
 
-func Not(expr Sqlizer) Expression {
-	return SQL("NOT (?)", expr)
-}
-
-func Equals(ident string, value any) Expression {
-	return SQL(fmt.Sprintf("%s = ?", ident), value)
-}
-
-func NotEquals(ident string, value any) Expression {
-	return SQL(fmt.Sprintf("%s <> ?", ident), value)
-}
-
-func Greater(ident string, value any) Expression {
-	return SQL(fmt.Sprintf("%s > ?", ident), value)
-}
-
-func GreaterOrEquals(ident string, value any) Expression {
-	return SQL(fmt.Sprintf("%s >= ?", ident), value)
-}
-
-func Less(ident string, value any) Expression {
-	return SQL(fmt.Sprintf("%s < ?", ident), value)
-}
-
-func LessOrEquals(ident string, value any) Expression {
-	return SQL(fmt.Sprintf("%s <= ?", ident), value)
-}
-
-func Values(data ...[]any) Expression {
-	values := make([]Expression, len(data))
-
-	for j, d := range data {
-		values[j] = SQL("(?)", Join(", ", d...))
+		builder.Write(SQL("(?)", Join(", ", d...)))
 	}
 
-	return SQL("?", values)
-}
-
-type Insert struct {
-	Into    string
-	Columns []string
-	Values  [][]any
-}
-
-func (i Insert) ToSQL() (string, []any, error) {
-	return Append(
-		SQL(fmt.Sprintf("INSERT INTO %s ", i.Into)),
-		If(len(i.Columns) > 0, SQL(fmt.Sprintf("(%s) ", strings.Join(i.Columns, ", ")))),
-		SQL("VALUES ?", Values(i.Values...)),
-	).ToSQL()
-}
-
-type Update struct {
-	Table string
-	Set   any
-	Where any
-}
-
-func (u Update) ToSQL() (string, []any, error) {
-	return Append(
-		SQL(fmt.Sprintf("UPDATE %s SET ?", u.Table), u.Set),
-		If(u.Where != nil, SQL(" WHERE ?", u.Where)),
-	).ToSQL()
-}
-
-type Delete struct {
-	From  string
-	Where any
-}
-
-func (d Delete) ToSQL() (string, []any, error) {
-	return Append(
-		SQL(fmt.Sprintf("DELETE FROM %s", d.From)),
-		If(d.Where != nil, SQL(" WHERE ?", d.Where)),
-	).ToSQL()
-}
-
-type Table struct {
-	IfNotExists bool
-	Name        string
-	Columns     any
-	Constraints any
-}
-
-func (ct Table) ToSQL() (string, []any, error) {
-	return Append(
-		SQL("CREATE TABLE"),
-		If(ct.IfNotExists, SQL(" IF NOT EXISTS")),
-		SQL(fmt.Sprintf(" %s (", ct.Name)),
-		Join(", ", ct.Columns),
-		If(ct.Constraints != nil, SQL(", ?", ct.Constraints)),
-		SQL(")"),
-	).ToSQL()
-}
-
-type Column struct {
-	Name        string
-	Type        string
-	Constraints any
-}
-
-func (cs Column) ToSQL() (string, []any, error) {
-	return Append(
-		SQL(fmt.Sprintf("%s %s", cs.Name, cs.Type)),
-		If(cs.Constraints != nil, SQL(" ?", Join(" ", cs.Constraints))),
-	).ToSQL()
+	return builder.ToSQL()
 }
 
 func toExpression(expr any, sep string) (Expression, bool) {
@@ -318,19 +200,6 @@ func toSQL(expr any, sep string) (string, []any, error) {
 	}
 
 	return ex.ToSQL()
-}
-
-func ToDDL(expr any) (string, error) {
-	sql, args, err := toSQL(expr, ", ")
-	if err != nil {
-		return "", err
-	}
-
-	if len(args) > 0 {
-		return "", ErrInvalidNumberOfArguments
-	}
-
-	return sql, nil
 }
 
 func NewBuilder() *Builder {

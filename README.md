@@ -47,17 +47,17 @@ In addition, there are expressions, such as ```superbasic.Select``` or ```superb
 
 ```go
 query := superbasic.Select{
-	Columns: []superbasic.Expr{
+	Columns: []superbasic.Sqlizer{
 		superbasic.SQL("id"),
 		superbasic.SQL("first"),
 		superbasic.SQL("last"),
 	},
-	From: []superbasic.Expr{
+	From: []superbasic.Sqlizer{
 		superbasic.SQL("presidents"),
 	},
 	Where: superbasic.SQL("? OR ?",
 		superbasic.SQL("last = ?", "Bush"), superbasic.SQL("first = ?", "Joe")),
-	OrderBy: []superbasic.Expr{
+	OrderBy: []superbasic.Sqlizer{
 		superbasic.SQL("last"),
 	},
 	Limit: 3,
@@ -115,13 +115,13 @@ The next section shows the ```superbasic.Select``` expression. Here you can see 
 ```go
 type Select struct {
 	Distinct bool
-	Columns  []Expr
-	From     []Expr
-	Joins    []Expr
-	Where    Expr
-	GroupBy  []Expr
-	Having   Expr
-	OrderBy  []Expr
+	Columns  []Sqlizer
+	From     []Sqlizer
+	Joins    []Sqlizer
+	Where    Sqlizer
+	GroupBy  []Sqlizer
+	Having   Sqlizer
+	OrderBy  []Sqlizer
 	Limit    uint64
 	Offset   uint64
 }
@@ -146,40 +146,56 @@ func (s Select) ToSQL() (string, []any, error) {
 ## DDL expressions
 
 It is also possible to create DDL queries, for example using the predefined expression ```superbasic.Table```.
-```superbasic.ExprDDL``` is supported by ```superbasic.Expression``` and it makes sure that the expression doesn't contain arguments.
 
 ```go
 table := superbasic.Table{
 	IfNotExists: true,
 	Name:        "presidents",
-	Columns: []superbasic.ExprDDL{
+	Columns: []superbasic.Sqlizer{
 		superbasic.Column{
 			Name: "id",
 			Type: "SERIAL",
-			Constraints: []superbasic.ExprDDL{
+			Constraints: []superbasic.Sqlizer{
 				superbasic.SQL("PRIMARY KEY"),
 			},
 		},
 		superbasic.Column{
 			Name: "first",
 			Type: "TEXT",
-			Constraints: []superbasic.ExprDDL{
+			Constraints: []superbasic.Sqlizer{
 				superbasic.SQL("NOT NULL"),
 			},
 		},
 		superbasic.Column{
 			Name: "last",
 			Type: "TEXT",
-			Constraints: []superbasic.ExprDDL{
+			Constraints: []superbasic.Sqlizer{
 				superbasic.SQL("NOT NULL"),
 			},
 		},
 	},
-	Constraints: []superbasic.ExprDDL{
+	Constraints: []superbasic.Sqlizer{
 		superbasic.SQL("UNIQUE (first, last)"),
 	},
 }
 
-sql, err = table.ToDDL())
+sql, err := superbasic.ToDDL(table)
 // CREATE TABLE IF NOT EXISTS presidents (id SERIAL PRIMARY KEY, first TEXT NOT NULL, last TEXT NOT NULL, UNIQUE (first, last))
+```
+
+## SQL Builder
+
+Of course, there is also a builder that can be used to create the SQL query. Here is an example:
+
+```go
+b := superbasic.NewBuilder()
+
+b.WriteSQL("SELECT ").WriteSQL("first, last")
+b.WriteSQL(" FROM presidents")
+b.WriteSQL(" WHERE ")
+b.Write(superbasic.Join(" OR ", superbasic.SQL("last = ?", "Bush"), superbasic.SQL("first = ?", "Joe")))
+
+sql, args, err := b.ToSQL()
+// SELECT first, last FROM presidents WHERE last = ? OR first = ? 
+// [Bush Joe]
 ```

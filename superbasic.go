@@ -6,67 +6,10 @@ import (
 	"strings"
 )
 
-type Expr interface {
-	ToSQL() (string, []any, error)
-}
-
-type ExprDDL interface {
-	ToDDL() (string, error)
-}
-
 var ErrInvalidNumberOfArguments = errors.New("invalid number of arguments")
 
-//nolint:cyclop
-func toSQL(expr any, sep string) (string, []any, error) {
-	switch exp := expr.(type) {
-	case Expression:
-		return exp.ToSQL()
-	case Expr:
-		s, a, err := exp.ToSQL()
-		if err != nil {
-			return "", nil, fmt.Errorf("cannot resolve superbasic.Expr: %w", err)
-		}
-
-		return s, a, nil
-	case []Expression:
-		a := make([]any, len(exp))
-		for i := range exp {
-			a[i] = exp[i]
-		}
-
-		return Join(sep, a...).ToSQL()
-	case []Expr:
-		a := make([]any, len(exp))
-		for i := range exp {
-			a[i] = exp[i]
-		}
-
-		return Join(sep, a...).ToSQL()
-	case ExprDDL:
-		s, err := exp.ToDDL()
-		if err != nil {
-			return "", nil, fmt.Errorf("cannot resolve superbasic.ExprDDL: %w", err)
-		}
-
-		return s, nil, nil
-	case []ExprDDL:
-		a := make([]any, len(exp))
-		for i := range exp {
-			a[i] = exp[i]
-		}
-
-		return Join(sep, a...).ToSQL()
-	default:
-		return "?", []any{exp}, nil
-	}
-}
-
-func SQL(sql string, args ...any) Expression {
-	return Expression{
-		SQL:  sql,
-		Args: args,
-		Err:  nil,
-	}
+type Sqlizer interface {
+	ToSQL() (string, []any, error)
 }
 
 type Expression struct {
@@ -75,54 +18,41 @@ type Expression struct {
 	Err  error
 }
 
-func (e Expression) ToDDL() (string, error) {
-	sql, args, err := e.ToSQL()
-	if err != nil {
-		return "", err
-	}
-
-	if len(args) > 0 {
-		return "", ErrInvalidNumberOfArguments
-	}
-
-	return sql, nil
-}
-
 func (e Expression) ToSQL() (string, []any, error) {
 	if e.Err != nil {
 		return "", nil, e.Err
 	}
 
-	build := &strings.Builder{}
+	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(e.Args))
 
-	argIndex := -1
+	argsIndex := -1
 
 	for {
 		index := strings.IndexRune(e.SQL, '?')
 		if index < 0 {
-			build.WriteString(e.SQL)
+			builder.WriteString(e.SQL)
 
 			break
 		}
 
 		if index < len(e.SQL)-1 && e.SQL[index+1] == '?' {
-			build.WriteString(e.SQL[:index+2])
+			builder.WriteString(e.SQL[:index+2])
 			e.SQL = e.SQL[index+2:]
 
 			continue
 		}
 
-		argIndex++
+		argsIndex++
 
-		if argIndex >= len(e.Args) {
+		if argsIndex >= len(e.Args) {
 			return "", nil, ErrInvalidNumberOfArguments
 		}
 
-		build.WriteString(e.SQL[:index])
+		builder.WriteString(e.SQL[:index])
 		e.SQL = e.SQL[index+1:]
 
-		sql, args, err := toSQL(e.Args[argIndex], ", ")
+		sql, args, err := ToSQL(e.Args[argsIndex])
 		if err != nil {
 			return "", nil, err
 		}
@@ -131,155 +61,84 @@ func (e Expression) ToSQL() (string, []any, error) {
 			continue
 		}
 
-		build.WriteString(sql)
+		builder.WriteString(sql)
 
 		arguments = append(arguments, args...)
 	}
 
-	if argIndex != len(e.Args)-1 {
+	if argsIndex != len(e.Args)-1 {
 		return "", nil, ErrInvalidNumberOfArguments
 	}
 
-	return build.String(), arguments, nil
+	return builder.String(), arguments, nil
 }
 
-func ToPostgres(expr any) (string, []any, error) {
-	sql, args, err := toSQL(expr, ", ")
-	if err != nil {
-		return "", nil, err
-	}
-
-	build := &strings.Builder{}
-	argIndex := -1
-
-	for {
-		index := strings.IndexRune(sql, '?')
-		if index < 0 {
-			build.WriteString(sql)
-
-			break
-		}
-
-		if index < len(sql)-1 && sql[index+1] == '?' {
-			build.WriteString(sql[:index+1])
-			sql = sql[index+2:]
-
-			continue
-		}
-
-		argIndex++
-
-		build.WriteString(fmt.Sprintf("%s$%d", sql[:index], argIndex+1))
-		sql = sql[index+1:]
-	}
-
-	if argIndex != len(args)-1 {
-		return "", nil, ErrInvalidNumberOfArguments
-	}
-
-	return build.String(), args, nil
-}
-
-func Join(sep string, expr ...any) Expression {
-	if sep == "" {
-		return Append(expr...)
-	}
-
-	build := &strings.Builder{}
-	arguments := make([]any, 0, len(expr))
-
-	argIndex := 0
-
-	for _, e := range expr {
-		sql, args, err := toSQL(e, sep)
-		if err != nil {
-			return Error(err)
-		}
-
-		if sql == "" {
-			continue
-		}
-
-		if argIndex != 0 {
-			build.WriteString(sep)
-		}
-
-		build.WriteString(sql)
-
-		arguments = append(arguments, args...)
-
-		argIndex++
-	}
-
-	return SQL(build.String(), arguments...)
-}
-
-func Append(expr ...any) Expression {
-	build := &strings.Builder{}
-	arguments := make([]any, 0, len(expr))
-
-	for _, e := range expr {
-		sql, args, err := toSQL(e, ", ")
-		if err != nil {
-			return Error(err)
-		}
-
-		if sql == "" {
-			continue
-		}
-
-		build.WriteString(sql)
-
-		arguments = append(arguments, args...)
-	}
-
-	return SQL(build.String(), arguments...)
-}
-
-func If(condition bool, then any) Expression {
-	if condition {
-		s, a, err := toSQL(then, ", ")
-		if err != nil {
-			return Error(err)
-		}
-
-		return SQL(s, a...)
-	}
-
-	return SQL("")
-}
-
-func IfElse(condition bool, then any, els any) Expression {
-	if condition {
-		s, a, err := toSQL(then, ", ")
-		if err != nil {
-			return Error(err)
-		}
-
-		return SQL(s, a...)
-	}
-
-	s, a, err := toSQL(els, ", ")
-	if err != nil {
-		return Error(err)
-	}
-
-	return SQL(s, a...)
+func SQL(sql string, args ...any) Expression {
+	return Expression{SQL: sql, Args: args}
 }
 
 func Error(err error) Expression {
 	return Expression{SQL: "", Args: nil, Err: err}
 }
 
+func Join(sep string, expr ...any) Expression {
+	builder := &strings.Builder{}
+	arguments := make([]any, 0, len(expr))
+
+	i := 0
+
+	for _, e := range expr {
+		sql, args, err := ToSQL(e)
+		if err != nil {
+			return Expression{Err: err}
+		}
+
+		if sql == "" {
+			continue
+		}
+
+		if i != 0 {
+			builder.WriteString(sep)
+		}
+
+		i++
+
+		builder.WriteString(sql)
+		arguments = append(arguments, args...)
+	}
+
+	return Expression{SQL: builder.String(), Args: arguments}
+}
+
+func Append(expr ...any) Expression {
+	return Join("", expr...)
+}
+
+func If(cond bool, then any) Expression {
+	if !cond {
+		return SQL("")
+	}
+
+	return SQL("?", then)
+}
+
+func IfElse(cond bool, then any, els any) Expression {
+	if cond {
+		return SQL("?", then)
+	}
+
+	return SQL("?", els)
+}
+
 type Select struct {
 	Distinct bool
-	Columns  []Expr
-	From     []Expr
-	Joins    []Expr
-	Where    Expr
-	GroupBy  []Expr
-	Having   Expr
-	OrderBy  []Expr
+	Columns  []Sqlizer
+	From     []Sqlizer
+	Joins    []Sqlizer
+	Where    Sqlizer
+	GroupBy  []Sqlizer
+	Having   Sqlizer
+	OrderBy  []Sqlizer
 	Limit    uint64
 	Offset   uint64
 }
@@ -326,8 +185,8 @@ func (i Insert) ToSQL() (string, []any, error) {
 
 type Update struct {
 	Table string
-	Set   []Expr
-	Where Expr
+	Set   []Sqlizer
+	Where Sqlizer
 }
 
 func (u Update) ToSQL() (string, []any, error) {
@@ -339,7 +198,7 @@ func (u Update) ToSQL() (string, []any, error) {
 
 type Delete struct {
 	From  string
-	Where Expr
+	Where Sqlizer
 }
 
 func (d Delete) ToSQL() (string, []any, error) {
@@ -352,27 +211,164 @@ func (d Delete) ToSQL() (string, []any, error) {
 type Table struct {
 	IfNotExists bool
 	Name        string
-	Columns     []ExprDDL
-	Constraints []ExprDDL
+	Columns     []Sqlizer
+	Constraints []Sqlizer
 }
 
-func (ct Table) ToDDL() (string, error) {
+func (ct Table) ToSQL() (string, []any, error) {
 	return Append(
 		SQL("CREATE TABLE"),
 		If(ct.IfNotExists, SQL(" IF NOT EXISTS")),
 		SQL(fmt.Sprintf(" %s (?)", ct.Name), Join(", ", append(ct.Columns, ct.Constraints...))),
-	).ToDDL()
+	).ToSQL()
 }
 
 type Column struct {
 	Name        string
 	Type        string
-	Constraints []ExprDDL
+	Constraints []Sqlizer
 }
 
-func (cs Column) ToDDL() (string, error) {
+func (cs Column) ToSQL() (string, []any, error) {
 	return Append(
 		SQL(fmt.Sprintf("%s %s", cs.Name, cs.Type)),
 		If(len(cs.Constraints) > 0, SQL(" ?", cs.Constraints)),
-	).ToDDL()
+	).ToSQL()
+}
+
+func ToExpression(expr any) (Expression, bool) {
+	switch e := expr.(type) {
+	case Expression:
+		return e, true
+	case Sqlizer:
+		sql, args, err := e.ToSQL()
+
+		return Expression{SQL: sql, Args: args, Err: err}, true
+	case []Expression:
+		return Join(", ", anySlice(e)...), true
+	case []Sqlizer:
+		return Join(", ", anySlice(e)...), true
+	default:
+		return Expression{}, false
+	}
+}
+
+func anySlice[T any](s []T) []any {
+	out := make([]any, len(s))
+
+	for i := range out {
+		out[i] = s[i]
+	}
+
+	return out
+}
+
+func ToSQL(expr any) (string, []any, error) {
+	ex, ok := ToExpression(expr)
+	if !ok {
+		return "?", []any{expr}, nil
+	}
+
+	return ex.ToSQL()
+}
+
+func ToDDL(expr any) (string, error) {
+	sql, args, err := ToSQL(expr)
+	if err != nil {
+		return "", err
+	}
+
+	if len(args) > 0 {
+		return "", ErrInvalidNumberOfArguments
+	}
+
+	return sql, nil
+}
+
+func NewBuilder() *Builder {
+	return &Builder{
+		builder: &strings.Builder{},
+		args:    make([]any, 0, 1),
+	}
+}
+
+type Builder struct {
+	builder *strings.Builder
+	args    []any
+	err     error
+}
+
+func (b *Builder) ToSQL() (string, []any, error) {
+	if b.err != nil {
+		return "", nil, b.err
+	}
+
+	if b.builder == nil {
+		return "", nil, nil
+	}
+
+	return b.builder.String(), b.args, nil
+}
+
+func (b *Builder) Write(expr any) *Builder {
+	if b.err != nil {
+		return b
+	}
+
+	if b.builder == nil {
+		b.builder = &strings.Builder{}
+	}
+
+	sql, args, err := ToSQL(expr)
+	if err != nil {
+		b.err = err
+
+		return b
+	}
+
+	b.builder.WriteString(sql)
+	b.args = append(b.args, args...)
+
+	return b
+}
+
+func (b *Builder) WriteSQL(sql string, args ...any) *Builder {
+	return b.Write(SQL(sql, args...))
+}
+
+func ToPostgres(expr any) (string, []any, error) {
+	sql, args, err := ToSQL(expr)
+	if err != nil {
+		return "", nil, err
+	}
+
+	build := &strings.Builder{}
+	argIndex := -1
+
+	for {
+		index := strings.IndexRune(sql, '?')
+		if index < 0 {
+			build.WriteString(sql)
+
+			break
+		}
+
+		if index < len(sql)-1 && sql[index+1] == '?' {
+			build.WriteString(sql[:index+1])
+			sql = sql[index+2:]
+
+			continue
+		}
+
+		argIndex++
+
+		build.WriteString(fmt.Sprintf("%s$%d", sql[:index], argIndex+1))
+		sql = sql[index+1:]
+	}
+
+	if argIndex != len(args)-1 {
+		return "", nil, ErrInvalidNumberOfArguments
+	}
+
+	return build.String(), args, nil
 }

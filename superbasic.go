@@ -1,3 +1,4 @@
+//nolint:exhaustivestruct,exhaustruct
 package superbasic
 
 import (
@@ -85,7 +86,7 @@ func Join(sep string, expr ...any) Expression {
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(expr))
 
-	i := 0
+	isFirst := true
 
 	for _, e := range expr {
 		sql, args, err := ToSQL(e)
@@ -97,13 +98,14 @@ func Join(sep string, expr ...any) Expression {
 			continue
 		}
 
-		if i != 0 {
+		if !isFirst {
 			builder.WriteString(sep)
 		}
 
-		i++
+		isFirst = false
 
 		builder.WriteString(sql)
+
 		arguments = append(arguments, args...)
 	}
 
@@ -237,17 +239,17 @@ func (cs Column) ToSQL() (string, []any, error) {
 }
 
 func ToExpression(expr any) (Expression, bool) {
-	switch e := expr.(type) {
+	switch expression := expr.(type) {
 	case Expression:
-		return e, true
+		return expression, true
 	case Sqlizer:
-		sql, args, err := e.ToSQL()
+		sql, args, err := expression.ToSQL()
 
 		return Expression{SQL: sql, Args: args, Err: err}, true
 	case []Expression:
-		return Join(", ", anySlice(e)...), true
+		return Join(", ", anySlice(expression)...), true
 	case []Sqlizer:
-		return Join(", ", anySlice(e)...), true
+		return Join(", ", anySlice(expression)...), true
 	default:
 		return Expression{}, false
 	}

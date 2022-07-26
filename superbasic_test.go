@@ -161,14 +161,16 @@ func TestSelect(t *testing.T) {
 }
 
 func TestBuilder(t *testing.T) {
-	b := superbasic.NewBuilder()
+	t.Parallel()
 
-	b.WriteSQL("SELECT ").WriteSQL("first, last")
-	b.WriteSQL(" FROM presidents")
-	b.WriteSQL(" WHERE ")
-	b.Write(superbasic.Join(" OR ", superbasic.SQL("last = ?", "Bush"), superbasic.SQL("first = ?", "Joe")))
+	builder := superbasic.NewBuilder()
 
-	sql, args, err := b.ToSQL()
+	builder.WriteSQL("SELECT ").WriteSQL("first, last")
+	builder.WriteSQL(" FROM presidents")
+	builder.WriteSQL(" WHERE ")
+	builder.Write(superbasic.Join(" OR ", superbasic.SQL("last = ?", "Bush"), superbasic.SQL("first = ?", "Joe")))
+
+	sql, args, err := builder.ToSQL()
 	if err != nil {
 		t.Error(err)
 	}

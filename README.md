@@ -69,13 +69,4 @@ delete := superbasic.SQL("DELETE FROM presidents WHERE ?",
 
 fmt.Println(superbasic.ToPostgres(delete))
 // DELETE FROM presidents WHERE last = $1 AND first = $2 [Bush Joe]
-
-builder := superbasic.NewBuilder().WriteSQL("SELECT ")
-
-builder.Write(superbasic.Columns(columns)).WriteSQL(" FROM presidents")
-
-builder.Write(superbasic.SQL(" WHERE first IN (?, ?)", "Barack", "Donald"))
-
-fmt.Println(builder.ToSQL())
-// SELECT id, first, last FROM presidents WHERE first IN (?, ?) [Barack Donald]
 ```

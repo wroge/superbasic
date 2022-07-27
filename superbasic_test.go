@@ -96,3 +96,39 @@ func TestDelete(t *testing.T) {
 		t.Fatal(sql, args)
 	}
 }
+
+func TestEscape(t *testing.T) {
+	t.Parallel()
+
+	expr := superbasic.SQL("?? hello ? ??", "world")
+	if expr.Err != nil {
+		t.Error(expr.Err)
+	}
+
+	sql, args, err := superbasic.ToPostgres(expr)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if sql != "? hello $1 ?" || len(args) != 1 {
+		t.Fatal(sql, args)
+	}
+}
+
+func TestExpressionSlice(t *testing.T) {
+	t.Parallel()
+
+	expr := superbasic.SQL("?", []superbasic.Expression{
+		superbasic.SQL("hello"),
+		superbasic.SQL("world"),
+		superbasic.IfElse(true, superbasic.SQL("welcome"), superbasic.SQL("moin")),
+		superbasic.IfElse(false, superbasic.SQL("welcome"), superbasic.SQL("moin")),
+	})
+	if expr.Err != nil {
+		t.Error(expr.Err)
+	}
+
+	if expr.SQL != "hello, world, welcome, moin" || len(expr.Args) != 0 {
+		t.Fatal(expr.SQL, expr.Err)
+	}
+}

@@ -1,4 +1,4 @@
-//nolint:exhaustivestruct,exhaustruct,wrapcheck,funlen,cyclop
+//nolint:exhaustivestruct,exhaustruct,wrapcheck,funlen,cyclop,gocognit
 package superbasic
 
 import (
@@ -9,15 +9,19 @@ import (
 
 var ErrInvalidNumberOfArguments = errors.New("invalid number of arguments")
 
+var ErrInvalidExpression = errors.New("invalid expression")
+
 // Sqlizer returns a prepared statement.
 type Sqlizer interface {
 	ToSQL() (string, []any, error)
 }
 
 // SQL takes a template with placeholders into which expressions can be compiled.
-// Expressions can be of type Sqlizer or []Sqlizer. []Sqlizer gets joined to an
-// Expression with ", " as separator. All other values will be put into the arguments
-// of a prepared statement.
+// Expressions can be of type Sqlizer or []Sqlizer.
+// []Sqlizer gets joined to an Expression with ", " as separator.
+// []any is compiled to an array of placeholders [ (?, ?) ].
+// [][]any is compiled to an array of values [ (?, ?), (?, ?) ].
+// All other values will be put into the arguments of a prepared statement.
 // You can escape '?' by using '??'.
 func SQL(template string, expressions ...any) Expression {
 	builder := &strings.Builder{}
@@ -61,7 +65,31 @@ func SQL(template string, expressions ...any) Expression {
 		case []Sqlizer:
 			sql, args, err = Join(", ", expr...).ToSQL()
 		case []Expression:
-			sql, args, err = Join(", ", toSqlizerSlice(expr)...).ToSQL()
+			arr := make([]Sqlizer, len(expr))
+
+			for i := range arr {
+				arr[i] = expr[i]
+			}
+
+			sql, args, err = Join(", ", arr...).ToSQL()
+		case []any:
+			if len(expr) == 0 {
+				return Expression{Err: ErrInvalidExpression}
+			}
+
+			sql = "(" + strings.Repeat(", ?", len(expr))[2:] + ")"
+			args = expr
+		case [][]any:
+			arr := make([]Sqlizer, len(expr))
+
+			for index := range arr {
+				if index != 0 {
+					sql += ", "
+				}
+
+				sql += "(" + strings.Repeat(", ?", len(expr[index]))[2:] + ")"
+				args = append(args, expr[index]...)
+			}
 		default:
 			sql = "?"
 			args = []any{expr}
@@ -88,23 +116,23 @@ func SQL(template string, expressions ...any) Expression {
 }
 
 // Append builds an Expression by appending Sqlizer's.
-func Append(expr ...Sqlizer) Expression {
-	return Join("", expr...)
+func Append(expressions ...Sqlizer) Expression {
+	return Join("", expressions...)
 }
 
 // Join builds an Expression by joining Sqlizer's with a separator.
-func Join(sep string, expr ...Sqlizer) Expression {
+func Join(sep string, expressions ...Sqlizer) Expression {
 	builder := &strings.Builder{}
-	arguments := make([]any, 0, len(expr))
+	arguments := make([]any, 0, len(expressions))
 
 	isFirst := true
 
-	for _, e := range expr {
-		if e == nil {
+	for _, expr := range expressions {
+		if expr == nil {
 			continue
 		}
 
-		sql, args, err := e.ToSQL()
+		sql, args, err := expr.ToSQL()
 		if err != nil {
 			return Expression{Err: err}
 		}
@@ -183,42 +211,6 @@ func (c Columns) ToSQL() (string, []any, error) {
 	return strings.Join(c, ", "), nil, nil
 }
 
-func toAnySlice[T any](s []T) []any {
-	out := make([]any, len(s))
-
-	for i := range out {
-		out[i] = s[i]
-	}
-
-	return out
-}
-
-// Values is a Sqlizer that takes a list of values.
-type Values[T any] [][]T
-
-// ToSQL is the implementation of the Sqlizer interface.
-func (v Values[T]) ToSQL() (string, []any, error) {
-	if len(v) == 0 {
-		return "", nil, nil
-	}
-
-	placeholders := make([]string, len(v))
-
-	var args []any
-
-	for i, values := range v {
-		placeholders[i] = "(" + strings.Repeat(", ?", len(values))[2:] + ")"
-
-		if len(args) == 0 {
-			args = make([]any, 0, len(v)*len(values))
-		}
-
-		args = append(args, toAnySlice(values)...)
-	}
-
-	return strings.Join(placeholders, ", "), args, nil
-}
-
 // ToPostgres transforms a Sqlizer to a valid postgres statement.
 func ToPostgres(expr Sqlizer) (string, []any, error) {
 	sql, args, err := expr.ToSQL()
@@ -255,14 +247,4 @@ func ToPostgres(expr Sqlizer) (string, []any, error) {
 	}
 
 	return build.String(), args, nil
-}
-
-func toSqlizerSlice(s []Expression) []Sqlizer {
-	out := make([]Sqlizer, len(s))
-
-	for i := range out {
-		out[i] = s[i]
-	}
-
-	return out
 }

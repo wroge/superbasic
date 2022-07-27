@@ -11,7 +11,7 @@ func TestInsert(t *testing.T) {
 
 	insert := superbasic.SQL("INSERT INTO presidents (?) VALUES ? RETURNING id",
 		superbasic.Columns{"id", "first", "last"},
-		superbasic.Values[any]{
+		[][]any{
 			{46, "Joe", "Biden"},
 			{45, "Donald", "trump"},
 			{44, "Barack", "Obama"},
@@ -58,12 +58,11 @@ func TestQuery(t *testing.T) {
 	t.Parallel()
 
 	columns := []string{"id", "first", "last"}
-	lastnames := []string{"Bush", "Clinton"}
 	sort := "first"
 
 	query := superbasic.Append(
 		superbasic.SQL("SELECT ? FROM presidents", superbasic.Columns(columns)),
-		superbasic.If(len(lastnames) > 0, superbasic.SQL(" WHERE last IN ?", superbasic.Values[string]{lastnames})),
+		superbasic.SQL(" WHERE last IN ?", []any{"Bush", "Clinton"}),
 		superbasic.If(sort != "", superbasic.SQL(" ORDER BY ?", superbasic.SQL(sort))),
 	)
 

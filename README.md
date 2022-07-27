@@ -17,7 +17,7 @@ Simply put, superbasic helps you write prepared statements, and is also a kind o
 ```go
 insert := superbasic.SQL("INSERT INTO presidents (?) VALUES ? RETURNING id",
 	superbasic.Columns{"id", "first", "last"},
-	superbasic.Values{
+	superbasic.Values[any]{
 		{46, "Joe", "Biden"},
 		{45, "Donald", "trump"},
 		{44, "Barack", "Obama"},
@@ -46,12 +46,12 @@ fmt.Println(update.ToSQL())
 
 
 columns := []string{"id", "first", "last"}
-lastnames := []any{"Bush", "Clinton"}
+lastnames := []string{"Bush", "Clinton"}
 sort := "first"
 
 query := superbasic.Append(
 	superbasic.SQL("SELECT ? FROM presidents", superbasic.Columns(columns)),
-	superbasic.If(len(lastnames) > 0, superbasic.SQL(" WHERE last IN ?", superbasic.Values{lastnames})),
+	superbasic.If(len(lastnames) > 0, superbasic.SQL(" WHERE last IN ?", superbasic.Values[string]{lastnames})),
 	superbasic.If(sort != "", superbasic.SQL(" ORDER BY ?", superbasic.SQL(sort))),
 )
 

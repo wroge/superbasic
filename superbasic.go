@@ -131,7 +131,7 @@ func Join(sep string, expr ...Sqlizer) Expression {
 // If the condition is false, an empty Expression is returned.
 func If(condition bool, then Sqlizer) Expression {
 	if condition {
-		return ToExpression(then)
+		return toExpression(then)
 	}
 
 	return Expression{}
@@ -140,14 +140,13 @@ func If(condition bool, then Sqlizer) Expression {
 // IfElse returns then Sqlizer on true and els on false as Expression.
 func IfElse(condition bool, then, els Sqlizer) Expression {
 	if condition {
-		return ToExpression(then)
+		return toExpression(then)
 	}
 
-	return ToExpression(els)
+	return toExpression(els)
 }
 
-// ToExpression returns a valid Expression from a Sqlizer.
-func ToExpression(expr Sqlizer) Expression {
+func toExpression(expr Sqlizer) Expression {
 	if expr == nil {
 		return Expression{}
 	}
@@ -184,11 +183,21 @@ func (c Columns) ToSQL() (string, []any, error) {
 	return strings.Join(c, ", "), nil, nil
 }
 
+func toAnySlice[T any](s []T) []any {
+	out := make([]any, len(s))
+
+	for i := range out {
+		out[i] = s[i]
+	}
+
+	return out
+}
+
 // Values is a Sqlizer that takes a list of values.
-type Values [][]any
+type Values[T any] [][]T
 
 // ToSQL is the implementation of the Sqlizer interface.
-func (v Values) ToSQL() (string, []any, error) {
+func (v Values[T]) ToSQL() (string, []any, error) {
 	if len(v) == 0 {
 		return "", nil, nil
 	}
@@ -204,7 +213,7 @@ func (v Values) ToSQL() (string, []any, error) {
 			args = make([]any, 0, len(v)*len(values))
 		}
 
-		args = append(args, values...)
+		args = append(args, toAnySlice(values)...)
 	}
 
 	return strings.Join(placeholders, ", "), args, nil

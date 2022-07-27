@@ -56,7 +56,8 @@ query := superbasic.Append(
 )
 
 fmt.Println(query.ToSQL())
-// SELECT id, first, last FROM presidents WHERE last IN (?, ?) ORDER BY first [Bush,Clinton]
+// SELECT id, first, last FROM presidents WHERE last IN (?, ?) ORDER BY first 
+// [Bush Clinton]
 
 
 delete := superbasic.SQL("DELETE FROM presidents WHERE ?",

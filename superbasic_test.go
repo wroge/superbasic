@@ -10,14 +10,14 @@ func TestInsert(t *testing.T) {
 	t.Parallel()
 
 	insert := superbasic.SQL("INSERT INTO presidents (?) VALUES ? RETURNING id",
-		superbasic.Columns{"first", "last"},
+		superbasic.Columns{"id", "first", "last"},
 		superbasic.Values{
-			{"Joe", "Biden"},
-			{"Donald", "trump"},
-			{"Barack", "Obama"},
-			{"George W.", "Bush"},
-			{"Bill", "Clinton"},
-			{"George H. W.", "Bush"},
+			{46, "Joe", "Biden"},
+			{45, "Donald", "trump"},
+			{44, "Barack", "Obama"},
+			{43, "George W.", "Bush"},
+			{42, "Bill", "Clinton"},
+			{41, "George H. W.", "Bush"},
 		},
 	)
 
@@ -26,8 +26,9 @@ func TestInsert(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "INSERT INTO presidents (first, last) "+
-		"VALUES ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12) RETURNING id" || len(args) != 12 {
+	if sql != "INSERT INTO presidents (id, first, last) VALUES"+
+		" ($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12),"+
+		" ($13, $14, $15), ($16, $17, $18) RETURNING id" || len(args) != 18 {
 		t.Fatal(sql, args)
 	}
 }
@@ -35,9 +36,12 @@ func TestInsert(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	t.Parallel()
 
-	update := superbasic.SQL("UPDATE presidents SET last = ? WHERE ?",
-		"Trump",
-		superbasic.SQL("first = ?", "Donald"),
+	update := superbasic.SQL("UPDATE presidents SET ? WHERE ?",
+		[]superbasic.Sqlizer{
+			superbasic.SQL("first = ?", "Donald"),
+			superbasic.SQL("last = ?", "Trump"),
+		},
+		superbasic.SQL("id = ?", 45),
 	)
 
 	sql, args, err := update.ToSQL()
@@ -45,7 +49,7 @@ func TestUpdate(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "UPDATE presidents SET last = ? WHERE first = ?" || len(args) != 2 {
+	if sql != "UPDATE presidents SET first = ?, last = ? WHERE id = ?" || len(args) != 3 {
 		t.Fatal(sql, args)
 	}
 }
@@ -54,12 +58,12 @@ func TestQuery(t *testing.T) {
 	t.Parallel()
 
 	columns := []string{"id", "first", "last"}
-	lastname := "Bush"
+	lastnames := []any{"Bush", "Clinton"}
 	sort := "first"
 
 	query := superbasic.Append(
 		superbasic.SQL("SELECT ? FROM presidents", superbasic.Columns(columns)),
-		superbasic.If(lastname != "", superbasic.SQL(" WHERE last = ?", lastname)),
+		superbasic.If(len(lastnames) > 0, superbasic.SQL(" WHERE last IN ?", superbasic.Values{lastnames})),
 		superbasic.If(sort != "", superbasic.SQL(" ORDER BY ?", superbasic.SQL(sort))),
 	)
 
@@ -68,7 +72,7 @@ func TestQuery(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "SELECT id, first, last FROM presidents WHERE last = ? ORDER BY first" || len(args) != 1 {
+	if sql != "SELECT id, first, last FROM presidents WHERE last IN (?, ?) ORDER BY first" || len(args) != 2 {
 		t.Fatal(sql, args)
 	}
 }

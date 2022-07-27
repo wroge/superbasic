@@ -1,4 +1,4 @@
-//nolint:exhaustivestruct,exhaustruct
+//nolint:exhaustivestruct,exhaustruct,wrapcheck,funlen,cyclop
 package superbasic
 
 import (
@@ -9,91 +9,64 @@ import (
 
 var ErrInvalidNumberOfArguments = errors.New("invalid number of arguments")
 
+// Sqlizer returns a prepared statement.
 type Sqlizer interface {
 	ToSQL() (string, []any, error)
 }
 
-type Expression struct {
-	SQL  string
-	Args []any
-	Err  error
-}
-
-func (e Expression) ToSQL() (string, []any, error) {
-	if e.Err != nil {
-		return "", nil, e.Err
-	}
-
+// SQL takes a template with placeholders into which expressions can be compiled.
+// Expressions can be of type Sqlizer or []Sqlizer. []Sqlizer gets joined to an
+// Expression with ", " as separator. All other values will be put into the arguments
+// of a prepared statement.
+// You can escape '?' by using '??'.
+func SQL(template string, expressions ...any) Expression {
 	builder := &strings.Builder{}
-	arguments := make([]any, 0, len(e.Args))
+	arguments := make([]any, 0, len(expressions))
 
-	argsIndex := -1
+	exprIndex := -1
 
 	for {
-		index := strings.IndexRune(e.SQL, '?')
+		index := strings.IndexRune(template, '?')
 		if index < 0 {
-			builder.WriteString(e.SQL)
+			builder.WriteString(template)
 
 			break
 		}
 
-		if index < len(e.SQL)-1 && e.SQL[index+1] == '?' {
-			builder.WriteString(e.SQL[:index+2])
-			e.SQL = e.SQL[index+2:]
+		if index < len(template)-1 && template[index+1] == '?' {
+			builder.WriteString(template[:index+2])
+			template = template[index+2:]
 
 			continue
 		}
 
-		argsIndex++
+		exprIndex++
 
-		if argsIndex >= len(e.Args) {
-			return "", nil, ErrInvalidNumberOfArguments
+		if exprIndex >= len(expressions) {
+			return Expression{Err: ErrInvalidNumberOfArguments}
 		}
 
-		builder.WriteString(e.SQL[:index])
-		e.SQL = e.SQL[index+1:]
+		builder.WriteString(template[:index])
+		template = template[index+1:]
 
-		sql, args, err := toSQL(e.Args[argsIndex], ", ")
-		if err != nil {
-			return "", nil, err
+		var (
+			sql  string
+			args []any
+			err  error
+		)
+
+		switch expr := expressions[exprIndex].(type) {
+		case Sqlizer:
+			sql, args, err = expr.ToSQL()
+		case []Sqlizer:
+			sql, args, err = Join(", ", expr...).ToSQL()
+		case []Expression:
+			sql, args, err = Join(", ", toSqlizerSlice(expr)...).ToSQL()
+		default:
+			sql = "?"
+			args = []any{expr}
 		}
 
-		if sql == "" {
-			continue
-		}
-
-		builder.WriteString(sql)
-
-		arguments = append(arguments, args...)
-	}
-
-	if argsIndex != len(e.Args)-1 {
-		return "", nil, ErrInvalidNumberOfArguments
-	}
-
-	return builder.String(), arguments, nil
-}
-
-func SQL(sql string, args ...any) Expression {
-	return Expression{SQL: sql, Args: args}
-}
-
-func Error(err error) Expression {
-	return Expression{SQL: "", Args: nil, Err: err}
-}
-
-func Join(sep string, expr ...any) Expression {
-	if len(expr) == 0 {
-		return SQL("")
-	}
-
-	builder := &strings.Builder{}
-	arguments := make([]any, 0, len(expr))
-
-	isFirst := true
-
-	for _, e := range expr {
-		sql, args, err := toSQL(e, sep)
 		if err != nil {
 			return Expression{Err: err}
 		}
@@ -102,13 +75,51 @@ func Join(sep string, expr ...any) Expression {
 			continue
 		}
 
-		if !isFirst {
-			builder.WriteString(sep)
+		builder.WriteString(sql)
+
+		arguments = append(arguments, args...)
+	}
+
+	if exprIndex != len(expressions)-1 {
+		return Expression{Err: ErrInvalidNumberOfArguments}
+	}
+
+	return Expression{SQL: builder.String(), Args: arguments}
+}
+
+// Append builds an Expression by appending Sqlizer's.
+func Append(expr ...Sqlizer) Expression {
+	return Join("", expr...)
+}
+
+// Join builds an Expression by joining Sqlizer's with a separator.
+func Join(sep string, expr ...Sqlizer) Expression {
+	builder := &strings.Builder{}
+	arguments := make([]any, 0, len(expr))
+
+	isFirst := true
+
+	for _, e := range expr {
+		if e == nil {
+			continue
 		}
 
-		isFirst = false
+		sql, args, err := e.ToSQL()
+		if err != nil {
+			return Expression{Err: err}
+		}
 
-		builder.WriteString(sql)
+		if sql == "" {
+			continue
+		}
+
+		if isFirst {
+			isFirst = false
+
+			builder.WriteString(sql)
+		} else {
+			builder.WriteString(sep + sql)
+		}
 
 		arguments = append(arguments, args...)
 	}
@@ -116,145 +127,92 @@ func Join(sep string, expr ...any) Expression {
 	return Expression{SQL: builder.String(), Args: arguments}
 }
 
-func Append(expr ...any) Expression {
-	return Join("", expr...)
-}
-
-func If(cond bool, then any) Expression {
-	if !cond {
-		return SQL("")
+// If returns then if condition is true.
+// If the condition is false, an empty Expression is returned.
+func If(condition bool, then Sqlizer) Expression {
+	if condition {
+		return ToExpression(then)
 	}
 
-	return SQL("?", then)
+	return Expression{}
 }
 
-func IfElse(cond bool, then any, els any) Expression {
-	if cond {
-		return SQL("?", then)
+// IfElse returns then Sqlizer on true and els on false as Expression.
+func IfElse(condition bool, then, els Sqlizer) Expression {
+	if condition {
+		return ToExpression(then)
 	}
 
-	return SQL("?", els)
+	return ToExpression(els)
 }
 
+// ToExpression returns a valid Expression from a Sqlizer.
+func ToExpression(expr Sqlizer) Expression {
+	if expr == nil {
+		return Expression{}
+	}
+
+	sql, args, err := expr.ToSQL()
+	if err != nil {
+		return Expression{Err: err}
+	}
+
+	return Expression{SQL: sql, Args: args}
+}
+
+// Expression represents a prepared statement.
+type Expression struct {
+	SQL  string
+	Args []any
+	Err  error
+}
+
+// ToSQL is the implementation of the Sqlizer interface.
+func (e Expression) ToSQL() (string, []any, error) {
+	if e.Err != nil {
+		return "", nil, e.Err
+	}
+
+	return e.SQL, e.Args, e.Err
+}
+
+// Columns in a Sqlizer that joins a list of identifiers with ", ".
 type Columns []string
 
-func (i Columns) ToSQL() (string, []any, error) {
-	return strings.Join(i, ", "), nil, nil
+// ToSQL is the implementation of the Sqlizer interface.
+func (c Columns) ToSQL() (string, []any, error) {
+	return strings.Join(c, ", "), nil, nil
 }
 
+// Values is a Sqlizer that takes a list of values.
 type Values [][]any
 
+// ToSQL is the implementation of the Sqlizer interface.
 func (v Values) ToSQL() (string, []any, error) {
-	builder := NewBuilder()
-
-	for i, d := range v {
-		if i != 0 {
-			builder.WriteSQL(", ")
-		}
-
-		builder.Write(SQL("(?)", Join(", ", d...)))
-	}
-
-	return builder.ToSQL()
-}
-
-func toExpression(expr any, sep string) (Expression, bool) {
-	switch expression := expr.(type) {
-	case Expression:
-		return expression, true
-	case Sqlizer:
-		sql, args, err := expression.ToSQL()
-
-		return Expression{SQL: sql, Args: args, Err: err}, true
-	case []Expression:
-		if len(expression) == 0 {
-			return SQL(""), true
-		}
-
-		return Join(sep, anySlice(expression)...), true
-	case []Sqlizer:
-		if len(expression) == 0 {
-			return SQL(""), true
-		}
-
-		return Join(sep, anySlice(expression)...), true
-	default:
-		return Expression{}, false
-	}
-}
-
-func anySlice[T any](s []T) []any {
-	out := make([]any, len(s))
-
-	for i := range out {
-		out[i] = s[i]
-	}
-
-	return out
-}
-
-func toSQL(expr any, sep string) (string, []any, error) {
-	ex, ok := toExpression(expr, sep)
-	if !ok {
-		return "?", []any{expr}, nil
-	}
-
-	return ex.ToSQL()
-}
-
-func NewBuilder() *Builder {
-	return &Builder{
-		builder: &strings.Builder{},
-		args:    make([]any, 0, 1),
-	}
-}
-
-type Builder struct {
-	builder *strings.Builder
-	args    []any
-	err     error
-}
-
-func (b *Builder) ToSQL() (string, []any, error) {
-	if b.err != nil {
-		return "", nil, b.err
-	}
-
-	if b.builder == nil {
+	if len(v) == 0 {
 		return "", nil, nil
 	}
 
-	return b.builder.String(), b.args, nil
-}
+	placeholders := make([]string, len(v))
 
-func (b *Builder) Write(expr any) *Builder {
-	if b.err != nil {
-		return b
+	var args []any
+
+	for i, values := range v {
+		placeholders[i] = "(" + strings.Repeat(", ?", len(values))[2:] + ")"
+
+		if len(args) == 0 {
+			args = make([]any, 0, len(v)*len(values))
+		}
+
+		args = append(args, values...)
 	}
 
-	if b.builder == nil {
-		b.builder = &strings.Builder{}
-	}
-
-	sql, args, err := toSQL(expr, ", ")
-	if err != nil {
-		b.err = err
-
-		return b
-	}
-
-	b.builder.WriteString(sql)
-	b.args = append(b.args, args...)
-
-	return b
+	return strings.Join(placeholders, ", "), args, nil
 }
 
-func (b *Builder) WriteSQL(sql string, args ...any) *Builder {
-	return b.Write(SQL(sql, args...))
-}
-
-func ToPostgres(expr any) (string, []any, error) {
-	sql, args, err := toSQL(expr, ", ")
+// ToPostgres transforms a Sqlizer to a valid postgres statement.
+func ToPostgres(expr Sqlizer) (string, []any, error) {
+	sql, args, err := expr.ToSQL()
 	if err != nil {
 		return "", nil, err
 	}
@@ -288,4 +246,14 @@ func ToPostgres(expr any) (string, []any, error) {
 	}
 
 	return build.String(), args, nil
+}
+
+func toSqlizerSlice(s []Expression) []Sqlizer {
+	out := make([]Sqlizer, len(s))
+
+	for i := range out {
+		out[i] = s[i]
+	}
+
+	return out
 }

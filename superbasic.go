@@ -33,25 +33,43 @@ type Expression interface {
 	ToSQL() (string, []any, error)
 }
 
-// Compile takes a template with placeholders into which expressions can be compiled.
-// You can escape '?' by using '??'.
-func Compile(template string, expressions ...Expression) Expression {
+func compile(sep string, expression any) (string, []any, error) {
+	switch expr := expression.(type) {
+	case Expression:
+		return expr.ToSQL()
+	case []Expression:
+		return Join(sep, anySlice(expr)...).ToSQL()
+	case [][]any:
+		return Join(sep, anySlice(expr)...).ToSQL()
+	case []any:
+		return fmt.Sprintf("(%s)", strings.Repeat(", ?", len(expr))[2:]), expr, nil
+	default:
+		return "?", []any{expr}, nil
+	}
+}
+
+// SQL takes a template with placeholders into which expressions can be compiled.
+// Expression []Expression is compiled to Join(", ", expr...).
+// Expression []any is compiled to (?, ?).
+// Expression [][]any is compiled to (?, ?), (?, ?).
+// Escape '?' by using '??'.
+func SQL(sql string, expressions ...any) Expression {
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(expressions))
 
 	exprIndex := -1
 
 	for {
-		index := strings.IndexRune(template, '?')
+		index := strings.IndexRune(sql, '?')
 		if index < 0 {
-			builder.WriteString(template)
+			builder.WriteString(sql)
 
 			break
 		}
 
-		if index < len(template)-1 && template[index+1] == '?' {
-			builder.WriteString(template[:index+2])
-			template = template[index+2:]
+		if index < len(sql)-1 && sql[index+1] == '?' {
+			builder.WriteString(sql[:index+2])
+			sql = sql[index+2:]
 
 			continue
 		}
@@ -66,10 +84,10 @@ func Compile(template string, expressions ...Expression) Expression {
 			return NumberOfArgumentsError{}
 		}
 
-		builder.WriteString(template[:index])
-		template = template[index+1:]
+		builder.WriteString(sql[:index])
+		sql = sql[index+1:]
 
-		sql, args, err := expressions[exprIndex].ToSQL()
+		sql, args, err := compile(", ", expressions[exprIndex])
 		if err != nil {
 			return expression{err: err}
 		}
@@ -90,18 +108,13 @@ func Compile(template string, expressions ...Expression) Expression {
 	return expression{sql: builder.String(), args: arguments}
 }
 
-// SQL returns an expression.
-func SQL(sql string, args ...any) Expression {
-	return expression{sql: sql, args: args}
-}
-
 // Append expressions.
-func Append(expressions ...Expression) Expression {
+func Append(expressions ...any) Expression {
 	return Join("", expressions...)
 }
 
 // Join joins expressions by a separator.
-func Join(sep string, expressions ...Expression) Expression {
+func Join(sep string, expressions ...any) Expression {
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(expressions))
 
@@ -112,7 +125,7 @@ func Join(sep string, expressions ...Expression) Expression {
 			return ExpressionError{}
 		}
 
-		sql, args, err := expr.ToSQL()
+		sql, args, err := compile(sep, expr)
 		if err != nil {
 			return expression{err: err}
 		}
@@ -137,126 +150,186 @@ func Join(sep string, expressions ...Expression) Expression {
 
 // If returns an expression based on a condition.
 // If false an empty expression is returned.
-func If(condition bool, then Expression) Expression {
+func If(condition bool, then any) Expression {
 	if condition {
-		return then
+		return SQL("?", then)
 	}
 
 	return expression{}
 }
 
 // IfElse returns an expression based on a condition.
-func IfElse(condition bool, then, els Expression) Expression {
+func IfElse(condition bool, then, els any) Expression {
 	if condition {
-		return then
+		return SQL("?", then)
 	}
 
-	return els
-}
-
-// Idents joins idents with ", " to an expression.
-func Idents(idents ...string) Expression {
-	return expression{sql: strings.Join(idents, ", ")}
-}
-
-// Value returns an expression with a placeholder.
-func Value(a any) Expression {
-	return expression{sql: "?", args: []any{a}}
-}
-
-// Values returns an expression with placeholders.
-func Values(a ...any) Expression {
-	return expression{sql: fmt.Sprintf("(%s)", strings.Repeat(", ?", len(a))[2:]), args: a}
+	return SQL("?", els)
 }
 
 // And returns a AND expression.
-func And(expr ...Expression) Expression {
+func And(expr ...any) Expression {
 	return Join(" AND ", expr...)
 }
 
 // Or returns a OR expression.
-func Or(left, right Expression) Expression {
-	return Compile("(? OR ?)", left, right)
+func Or(left, right any) Expression {
+	return SQL("(? OR ?)", left, right)
 }
 
 // Not returns a NOT expression.
-func Not(expr Expression) Expression {
-	return Compile("NOT (?)", expr)
+func Not(expr any) Expression {
+	return SQL("NOT (?)", expr)
 }
 
 // Equals returns an expression with an '=' sign.
-func Equals(ident string, value any) Expression {
-	return expression{sql: ident + " = ?", args: []any{value}}
+func Equals(left, right any) Expression {
+	return SQL("? = ?", left, right)
+}
+
+// EqualsIdent returns an expression with an '=' sign.
+func EqualsIdent(ident string, value any) Expression {
+	return Equals(SQL(ident), value)
 }
 
 // NotEquals returns an expression with an '<>' sign.
-func NotEquals(ident string, value any) Expression {
-	return expression{sql: ident + " <> ?", args: []any{value}}
+func NotEquals(left, right any) Expression {
+	return SQL("? <> ?", left, right)
+}
+
+// NotEqualsIdent returns an expression with an '<>' sign.
+func NotEqualsIdent(ident string, value any) Expression {
+	return NotEquals(SQL(ident), value)
 }
 
 // Greater returns an expression with an '>' sign.
-func Greater(ident string, value any) Expression {
-	return expression{sql: ident + " > ?", args: []any{value}}
+func Greater(left, right any) Expression {
+	return SQL("? > ?", left, right)
+}
+
+// GreaterIdent returns an expression with an '>' sign.
+func GreaterIdent(ident string, value any) Expression {
+	return Greater(SQL(ident), value)
 }
 
 // GreaterOrEquals returns an expression with an '>=' sign.
-func GreaterOrEquals(ident string, value any) Expression {
-	return expression{sql: ident + " >= ?", args: []any{value}}
+func GreaterOrEquals(left, right any) Expression {
+	return SQL("? >= ?", left, right)
+}
+
+// GreaterOrEqualsIdent returns an expression with an '>=' sign.
+func GreaterOrEqualsIdent(ident string, value any) Expression {
+	return GreaterOrEquals(SQL(ident), value)
 }
 
 // Less returns an expression with an '<' sign.
-func Less(ident string, value any) Expression {
-	return expression{sql: ident + " < ?", args: []any{value}}
+func Less(left, right any) Expression {
+	return SQL("? < ?", left, right)
+}
+
+// LessIdent returns an expression with an '<' sign.
+func LessIdent(ident string, value any) Expression {
+	return Less(SQL(ident), value)
 }
 
 // LessOrEquals returns an expression with an '<=' sign.
-func LessOrEquals(ident string, value any) Expression {
-	return expression{sql: ident + " <= ?", args: []any{value}}
+func LessOrEquals(left, right any) Expression {
+	return SQL("? <= ?", left, right)
+}
+
+// LessOrEqualsIdent returns an expression with an '<=' sign.
+func LessOrEqualsIdent(ident string, value any) Expression {
+	return LessOrEquals(SQL(ident), value)
 }
 
 // In returns a IN expression.
-func In(ident string, values ...any) Expression {
-	return expression{sql: fmt.Sprintf("%s IN (%s)", ident, strings.Repeat(", ?", len(values))[2:]), args: values}
+func In(left, right any) Expression {
+	return SQL("? IN ?", left, right)
+}
+
+// InIdent returns a IN expression.
+func InIdent(ident string, value any) Expression {
+	return In(SQL(ident), value)
 }
 
 // NotIn returns a NOT IN expression.
-func NotIn(ident string, values ...any) Expression {
-	return expression{sql: fmt.Sprintf("%s NOT IN (%s)", ident, strings.Repeat(", ?", len(values))[2:]), args: values}
+func NotIn(left, right any) Expression {
+	return SQL("? NOT IN ?", left, right)
+}
+
+// NotInIdent returns a NOT IN expression.
+func NotInIdent(ident string, value any) Expression {
+	return NotIn(SQL(ident), value)
 }
 
 // IsNull returns a IS NULL expression.
-func IsNull(ident string) Expression {
-	return expression{sql: fmt.Sprintf("%s IS NULL", ident)}
+func IsNull(expr any) Expression {
+	return SQL("? IS NULL", expr)
+}
+
+// IsNullIdent returns a IS NULL expression.
+func IsNullIdent(ident string) Expression {
+	return IsNull(SQL(ident))
 }
 
 // IsNotNull returns a IS NOT NULL expression.
-func IsNotNull(ident string) Expression {
-	return expression{sql: fmt.Sprintf("%s IS NOT NULL", ident)}
+func IsNotNull(expr any) Expression {
+	return SQL("? IS NOT NULL", expr)
+}
+
+// IsNotNullIdent returns a IS NOT NULL expression.
+func IsNotNullIdent(ident string) Expression {
+	return IsNotNull(SQL(ident))
 }
 
 // Between returns a BETWEEN expression.
-func Between(ident string, lower, higher any) Expression {
-	return expression{sql: fmt.Sprintf("%s BETWEEN ? AND ?", ident), args: []any{lower, higher}}
+func Between(expr, lower, higher any) Expression {
+	return SQL("? BETWEEN ? ANY ?", expr, lower, higher)
+}
+
+// BetweenIdent returns a BETWEEN expression.
+func BetweenIdent(ident string, lower, higher any) Expression {
+	return Between(SQL(ident), lower, higher)
 }
 
 // NotBetween returns a NOT BETWEEN expression.
-func NotBetween(ident string, lower, higher any) Expression {
-	return expression{sql: fmt.Sprintf("%s NOT BETWEEN ? AND ?", ident), args: []any{lower, higher}}
+func NotBetween(expr, lower, higher any) Expression {
+	return SQL("? NOT BETWEEN ? ANY ?", expr, lower, higher)
+}
+
+// NotBetweenIdent returns a NOT BETWEEN expression.
+func NotBetweenIdent(ident string, lower, higher any) Expression {
+	return NotBetween(SQL(ident), lower, higher)
 }
 
 // Like returns a LIKE expression.
-func Like(ident string, value any) Expression {
-	return expression{sql: fmt.Sprintf("%s LIKE ?", ident), args: []any{value}}
+func Like(left, right any) Expression {
+	return SQL("? LIKE ?", left, right)
+}
+
+// LikeIdent returns a LIKE expression.
+func LikeIdent(ident string, value any) Expression {
+	return Like(SQL(ident), value)
 }
 
 // NotLike returns a NOT LIKE expression.
-func NotLike(ident string, value any) Expression {
-	return expression{sql: fmt.Sprintf("%s NOT LIKE ?", ident), args: []any{value}}
+func NotLike(left, right any) Expression {
+	return SQL("? NOT LIKE ?", left, right)
+}
+
+// NotLikeIdent returns a LIKE expression.
+func NotLikeIdent(ident string, value any) Expression {
+	return NotLike(SQL(ident), value)
 }
 
 // Cast returns a CAST expression.
-func Cast(value any, as string) Expression {
-	return expression{sql: fmt.Sprintf("CAST(? AS %s)", as), args: []any{value}}
+func Cast(expr any, as string) Expression {
+	return SQL(fmt.Sprintf("CAST(? AS %s)", as), expr)
+}
+
+// CastIdent returns a CAST expression.
+func CastIdent(ident string, as string) Expression {
+	return Cast(SQL(ident), as)
 }
 
 type expression struct {
@@ -312,4 +385,14 @@ func ToPositional(placeholder string, expr Expression) (string, []any, error) {
 	}
 
 	return build.String(), args, nil
+}
+
+func anySlice[T any](s []T) []any {
+	out := make([]any, len(s))
+
+	for i := range out {
+		out[i] = s[i]
+	}
+
+	return out
 }

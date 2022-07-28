@@ -6,29 +6,27 @@
 [![codecov](https://codecov.io/gh/wroge/superbasic/branch/main/graph/badge.svg?token=SBSedMOGHR)](https://codecov.io/gh/wroge/superbasic)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/superbasic.svg?style=social)](https://github.com/wroge/superbasic/tags)
 
-```superbasic.Compile``` compiles expressions into a template.
-
-In addition, this package provides a set of functions that can be used to create expressions.
+```superbasic.SQL``` compiles expressions into a template.  
+In addition, this package provides a set of functions that can be used to create expressions.  
 
 ```go
 go get github.com/wroge/superbasic
 
-// Expression represents a prepared statement.
-type Expression interface {
-	ToSQL() (string, []any, error)
-}
+// []Expression is compiled to Join(", ", expr...).  
+// []any is compiled to (?, ?).  
+// [][]any is compiled to (?, ?), (?, ?).  
+// Escape '?' by using '??'.
 
-
-insert := superbasic.Compile("INSERT INTO presidents (?) VALUES ? RETURNING id",
-	superbasic.Idents("nr", "first", "last"),
-	superbasic.Join(", ",
-		superbasic.Values(46, "Joe", "Biden"),
-		superbasic.Values(45, "Donald", "trump"),
-		superbasic.Values(44, "Barack", "Obama"),
-		superbasic.Values(43, "George W.", "Bush"),
-		superbasic.Values(42, "Bill", "Clinton"),
-		superbasic.Values(41, "George H. W.", "Bush"),
-	),
+insert := superbasic.SQL("INSERT INTO presidents (?) VALUES ? RETURNING id",
+	superbasic.SQL("nr, first, last"),
+	[][]any{
+		{46, "Joe", "Biden"},
+		{45, "Donald", "trump"},
+		{44, "Barack", "Obama"},
+		{43, "George W.", "Bush"},
+		{42, "Bill", "Clinton"},
+		{41, "George H. W.", "Bush"},
+	},
 )
 
 fmt.Println(superbasic.ToPositional("$", insert))
@@ -36,12 +34,12 @@ fmt.Println(superbasic.ToPositional("$", insert))
 // [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush]
 
 
-update := superbasic.Compile("UPDATE presidents SET ? WHERE ?",
+update := superbasic.SQL("UPDATE presidents SET ? WHERE ?",
 	superbasic.Join(", ",
-		superbasic.Equals("first", "Donald"),
-		superbasic.Equals("last", "Trump"),
+		superbasic.EqualsIdent("first", "Donald"),
+		superbasic.EqualsIdent("last", "Trump"),
 	),
-	superbasic.Equals("nr", 45),
+	superbasic.EqualsIdent("nr", 45),
 )
 
 fmt.Println(update.ToSQL())
@@ -49,16 +47,19 @@ fmt.Println(update.ToSQL())
 // [Donald Trump 45]
 
 
-search := superbasic.In("last", "Bush", "Clinton")
+search := superbasic.And(
+	superbasic.InIdent("last", []any{"Bush", "Clinton"}),
+	superbasic.Not(superbasic.GreaterIdent("nr", 42)),
+)
 sort := "first"
 
 query := superbasic.Append(
-	superbasic.SQL("SELECT id, first, last FROM presidents"),
-	superbasic.If(search != nil, superbasic.Compile(" WHERE ?", search)),
+	superbasic.SQL("SELECT nr, first, last FROM presidents"),
+	superbasic.If(search != nil, superbasic.SQL(" WHERE ?", search)),
 	superbasic.If(sort != "", superbasic.SQL(fmt.Sprintf(" ORDER BY %s", sort))),
 )
 
 fmt.Println(query.ToSQL())
-// SELECT id, first, last FROM presidents WHERE last IN (?, ?) ORDER BY first
-// [Bush Clinton]
+// SELECT nr, first, last FROM presidents WHERE last IN (?, ?) AND NOT (nr > ?) ORDER BY first
+// [Bush Clinton 42]
 ```

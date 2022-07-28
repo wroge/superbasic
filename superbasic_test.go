@@ -22,7 +22,7 @@ func TestInsert(t *testing.T) {
 		),
 	)
 
-	sql, args, err := insert.ToPositional("$")
+	sql, args, err := superbasic.ToPositional("$", insert)
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,12 +58,15 @@ func TestUpdate(t *testing.T) {
 func TestQuery(t *testing.T) {
 	t.Parallel()
 
-	search := superbasic.In("last", "Bush", "Clinton")
+	search := superbasic.And(
+		superbasic.In("last", "Bush", "Clinton"),
+		superbasic.Not(superbasic.Greater("id", 42)),
+	)
 	sort := "first"
 
 	query := superbasic.Append(
 		superbasic.SQL("SELECT id, first, last FROM presidents"),
-		superbasic.If(search.SQL != "", superbasic.Compile(" WHERE ?", search)),
+		superbasic.If(search != nil, superbasic.Compile(" WHERE ?", search)),
 		superbasic.If(sort != "", superbasic.SQL(fmt.Sprintf(" ORDER BY %s", sort))),
 	)
 
@@ -72,7 +75,8 @@ func TestQuery(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "SELECT id, first, last FROM presidents WHERE last IN (?, ?) ORDER BY first" || len(args) != 2 {
+	if sql != "SELECT id, first, last FROM presidents WHERE last IN (?, ?) AND NOT (id > ?) ORDER BY first" ||
+		len(args) != 3 {
 		t.Fatal(sql, args)
 	}
 }
@@ -87,7 +91,7 @@ func TestDelete(t *testing.T) {
 		),
 	)
 
-	sql, args, err := del.ToPositional("$")
+	sql, args, err := superbasic.ToPositional("$", del)
 	if err != nil {
 		t.Error(err)
 	}
@@ -101,11 +105,8 @@ func TestEscape(t *testing.T) {
 	t.Parallel()
 
 	expr := superbasic.Compile("?? hello ? ??", superbasic.Value("world"))
-	if expr.Err != nil {
-		t.Error(expr.Err)
-	}
 
-	sql, args, err := expr.ToPositional("$")
+	sql, args, err := superbasic.ToPositional("$", expr)
 	if err != nil {
 		t.Error(err)
 	}
@@ -118,17 +119,17 @@ func TestEscape(t *testing.T) {
 func TestExpressionSlice(t *testing.T) {
 	t.Parallel()
 
-	expr := superbasic.Compile("?", superbasic.Join(", ",
+	sql, args, err := superbasic.Compile("?", superbasic.Join(", ",
 		superbasic.SQL("hello"),
 		superbasic.SQL("world"),
 		superbasic.IfElse(true, superbasic.SQL("welcome"), superbasic.SQL("moin")),
 		superbasic.IfElse(false, superbasic.SQL("welcome"), superbasic.SQL("moin")),
-	))
-	if expr.Err != nil {
-		t.Error(expr.Err)
+	)).ToSQL()
+	if err != nil {
+		t.Error(err)
 	}
 
-	if expr.SQL != "hello, world, welcome, moin" || len(expr.Args) != 0 {
-		t.Fatal(expr.SQL, expr.Err)
+	if sql != "hello, world, welcome, moin" || len(args) != 0 {
+		t.Fatal(sql, args)
 	}
 }

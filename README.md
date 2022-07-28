@@ -13,8 +13,8 @@ In addition, this package provides a set of functions that can be used to create
 ```go
 go get github.com/wroge/superbasic
 
-// Sqlizer represents a prepared statement.
-type Sqlizer interface {
+// Expression represents a prepared statement.
+type Expression interface {
 	ToSQL() (string, []any, error)
 }
 
@@ -31,7 +31,7 @@ insert := superbasic.Compile("INSERT INTO presidents (?) VALUES ? RETURNING id",
 	),
 )
 
-fmt.Println(insert.ToPositional("$"))
+fmt.Println(superbasic.ToPositional("$", insert))
 // INSERT INTO presidents (id, first, last) VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12), ($13, $14, $15), ($16, $17, $18) RETURNING id
 // [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush]
 
@@ -54,7 +54,7 @@ sort := "first"
 
 query := superbasic.Append(
 	superbasic.SQL("SELECT id, first, last FROM presidents"),
-	superbasic.If(search.SQL != "", superbasic.Compile(" WHERE ?", search)),
+	superbasic.If(search != nil, superbasic.Compile(" WHERE ?", search)),
 	superbasic.If(sort != "", superbasic.SQL(fmt.Sprintf(" ORDER BY %s", sort))),
 )
 

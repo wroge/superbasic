@@ -59,8 +59,8 @@ func TestQuery(t *testing.T) {
 	t.Parallel()
 
 	search := superbasic.And(
-		superbasic.In(superbasic.SQL("last"), []any{"Bush", "Clinton"}),
-		superbasic.Not(superbasic.Greater(superbasic.SQL("nr"), 42)),
+		superbasic.InIdent("last", []any{"Bush", "Clinton"}),
+		superbasic.Not(superbasic.GreaterIdent("nr", 42)),
 	)
 	sort := "first"
 
@@ -131,5 +131,78 @@ func TestExpressionSlice(t *testing.T) {
 
 	if sql != "hello, world, welcome, moin" || len(args) != 0 {
 		t.Fatal(sql, args)
+	}
+}
+
+func TestJoin(t *testing.T) {
+	sql, args, err := superbasic.Join(", ", nil).ToSQL()
+	if (err != superbasic.ExpressionError{}) {
+		t.Fatal("ExpressionError", sql, args, err)
+	}
+
+	sql, args, err = superbasic.Join(", ", superbasic.SQL(""), superbasic.SQL("?")).ToSQL()
+	if err.Error() != "invalid number of arguments" {
+		t.Fatal("NumberOfArgumentsError", sql, args, err)
+	}
+}
+
+func TestIf(t *testing.T) {
+	sql, _, err := superbasic.If(false, nil).ToSQL()
+	if err != nil {
+		t.Error(err)
+	}
+	if sql != "" {
+		t.Fail()
+	}
+}
+
+func TestSQL(t *testing.T) {
+	sql, args, err := superbasic.SQL("?", nil).ToSQL()
+	if err.Error() != "invalid expression" {
+		t.Fatal("ExpressionError", sql, args, err)
+	}
+
+	sql, args, err = superbasic.SQL("?", []superbasic.Expression{
+		superbasic.SQL("hello"), superbasic.SQL("world"),
+	}).ToSQL()
+
+	if sql != "hello, world" {
+		t.Fatal(sql, args, err)
+	}
+
+	sql, args, err = superbasic.SQL("?", []superbasic.Expression{
+		superbasic.SQL("hello"), superbasic.SQL(""), superbasic.SQL("?"),
+	}).ToSQL()
+	if (err != superbasic.NumberOfArgumentsError{}) {
+		t.Fatal("NumberOfArgumentsError 2", sql, args, err)
+	}
+
+	sql, args, err = superbasic.SQL("?", []superbasic.Expression{
+		superbasic.SQL("", []any{"hello"}),
+	}).ToSQL()
+	if sql != "" {
+		t.Fatal(sql, args, err)
+	}
+}
+
+func TestOr(t *testing.T) {
+	sql, args, err := superbasic.Or(superbasic.SQL("hello"), superbasic.SQL("moin")).ToSQL()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if sql != "(hello OR moin)" {
+		t.Fatal(sql, args, err)
+	}
+}
+
+func TestNotEquals(t *testing.T) {
+	sql, args, err := superbasic.NotEqualsIdent("hello", superbasic.SQL("moin")).ToSQL()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if sql != "hello <> moin" {
+		t.Fatal(sql, args, err)
 	}
 }

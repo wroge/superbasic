@@ -4,9 +4,9 @@ on:
     tags:
       - v*
     branches:
-      - master
       - main
   pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -31,7 +31,7 @@ jobs:
         with:
           go-version: 1.18
       - name: Run coverage
-        run: go test -race -coverprofile=coverage.txt -covermode=atomic
+        run: go test -coverprofile=coverage.txt -covermode=set
       - name: Codecov
         uses: codecov/codecov-action@v3.1.0
         with:

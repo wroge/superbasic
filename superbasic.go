@@ -40,7 +40,7 @@ func compile(sep string, expression any) (string, []any, error) {
 	case []Expression:
 		return Join(sep, anySlice(expr)...).ToSQL()
 	case [][]any:
-		return Join(sep, anySlice(expr)...).ToSQL()
+		return Join(", ", anySlice(expr)...).ToSQL()
 	case []any:
 		return fmt.Sprintf("(%s)", strings.Repeat(", ?", len(expr))[2:]), expr, nil
 	default:
@@ -76,12 +76,12 @@ func SQL(sql string, expressions ...any) Expression {
 
 		exprIndex++
 
-		if expressions[exprIndex] == nil {
-			return ExpressionError{}
-		}
-
 		if exprIndex >= len(expressions) {
 			return NumberOfArgumentsError{}
+		}
+
+		if expressions[exprIndex] == nil {
+			return ExpressionError{}
 		}
 
 		builder.WriteString(sql[:index])
@@ -90,10 +90,6 @@ func SQL(sql string, expressions ...any) Expression {
 		sql, args, err := compile(", ", expressions[exprIndex])
 		if err != nil {
 			return expression{err: err}
-		}
-
-		if sql == "" {
-			continue
 		}
 
 		builder.WriteString(sql)

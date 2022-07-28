@@ -1,6 +1,7 @@
 package superbasic_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/wroge/superbasic"
@@ -9,19 +10,19 @@ import (
 func TestInsert(t *testing.T) {
 	t.Parallel()
 
-	insert := superbasic.SQL("INSERT INTO presidents (?) VALUES ? RETURNING id",
-		superbasic.Columns{"id", "first", "last"},
-		[][]any{
-			{46, "Joe", "Biden"},
-			{45, "Donald", "trump"},
-			{44, "Barack", "Obama"},
-			{43, "George W.", "Bush"},
-			{42, "Bill", "Clinton"},
-			{41, "George H. W.", "Bush"},
-		},
+	insert := superbasic.Compile("INSERT INTO presidents (?) VALUES ? RETURNING id",
+		superbasic.Idents("id", "first", "last"),
+		superbasic.Join(", ",
+			superbasic.Values(46, "Joe", "Biden"),
+			superbasic.Values(45, "Donald", "trump"),
+			superbasic.Values(44, "Barack", "Obama"),
+			superbasic.Values(43, "George W.", "Bush"),
+			superbasic.Values(42, "Bill", "Clinton"),
+			superbasic.Values(41, "George H. W.", "Bush"),
+		),
 	)
 
-	sql, args, err := superbasic.ToPostgres(insert)
+	sql, args, err := insert.ToPositional("$")
 	if err != nil {
 		t.Error(err)
 	}
@@ -36,12 +37,12 @@ func TestInsert(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	t.Parallel()
 
-	update := superbasic.SQL("UPDATE presidents SET ? WHERE ?",
-		[]superbasic.Sqlizer{
-			superbasic.SQL("first = ?", "Donald"),
-			superbasic.SQL("last = ?", "Trump"),
-		},
-		superbasic.SQL("id = ?", 45),
+	update := superbasic.Compile("UPDATE presidents SET ? WHERE ?",
+		superbasic.Join(", ",
+			superbasic.Equals("first", "Donald"),
+			superbasic.Equals("last", "Trump"),
+		),
+		superbasic.Equals("id", 45),
 	)
 
 	sql, args, err := update.ToSQL()
@@ -57,13 +58,13 @@ func TestUpdate(t *testing.T) {
 func TestQuery(t *testing.T) {
 	t.Parallel()
 
-	columns := []string{"id", "first", "last"}
+	search := superbasic.In("last", "Bush", "Clinton")
 	sort := "first"
 
 	query := superbasic.Append(
-		superbasic.SQL("SELECT ? FROM presidents", superbasic.Columns(columns)),
-		superbasic.SQL(" WHERE last IN ?", []any{"Bush", "Clinton"}),
-		superbasic.If(sort != "", superbasic.SQL(" ORDER BY ?", superbasic.SQL(sort))),
+		superbasic.SQL("SELECT id, first, last FROM presidents"),
+		superbasic.If(search.SQL != "", superbasic.Compile(" WHERE ?", search)),
+		superbasic.If(sort != "", superbasic.SQL(fmt.Sprintf(" ORDER BY %s", sort))),
 	)
 
 	sql, args, err := query.ToSQL()
@@ -79,14 +80,14 @@ func TestQuery(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Parallel()
 
-	del := superbasic.SQL("DELETE FROM presidents WHERE ?",
+	del := superbasic.Compile("DELETE FROM presidents WHERE ?",
 		superbasic.Join(" AND ",
-			superbasic.SQL("last = ?", "Bush"),
-			superbasic.SQL("first = ?", "Joe"),
+			superbasic.Equals("last", "Bush"),
+			superbasic.Equals("first", "Joe"),
 		),
 	)
 
-	sql, args, err := superbasic.ToPostgres(del)
+	sql, args, err := del.ToPositional("$")
 	if err != nil {
 		t.Error(err)
 	}
@@ -99,12 +100,12 @@ func TestDelete(t *testing.T) {
 func TestEscape(t *testing.T) {
 	t.Parallel()
 
-	expr := superbasic.SQL("?? hello ? ??", "world")
+	expr := superbasic.Compile("?? hello ? ??", superbasic.Value("world"))
 	if expr.Err != nil {
 		t.Error(expr.Err)
 	}
 
-	sql, args, err := superbasic.ToPostgres(expr)
+	sql, args, err := expr.ToPositional("$")
 	if err != nil {
 		t.Error(err)
 	}
@@ -117,12 +118,12 @@ func TestEscape(t *testing.T) {
 func TestExpressionSlice(t *testing.T) {
 	t.Parallel()
 
-	expr := superbasic.SQL("?", []superbasic.Expression{
+	expr := superbasic.Compile("?", superbasic.Join(", ",
 		superbasic.SQL("hello"),
 		superbasic.SQL("world"),
 		superbasic.IfElse(true, superbasic.SQL("welcome"), superbasic.SQL("moin")),
 		superbasic.IfElse(false, superbasic.SQL("welcome"), superbasic.SQL("moin")),
-	})
+	))
 	if expr.Err != nil {
 		t.Error(expr.Err)
 	}

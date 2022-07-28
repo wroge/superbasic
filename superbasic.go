@@ -1,4 +1,4 @@
-//nolint:exhaustivestruct,exhaustruct,wrapcheck,funlen,cyclop,gocognit
+//nolint:exhaustivestruct,exhaustruct
 package superbasic
 
 import (
@@ -7,23 +7,20 @@ import (
 	"strings"
 )
 
+// ErrInvalidNumberOfArguments is returned if arguments doesn't match the number of placeholders.
 var ErrInvalidNumberOfArguments = errors.New("invalid number of arguments")
 
+// ErrInvalidExpression is returned if expressions are nil.
 var ErrInvalidExpression = errors.New("invalid expression")
 
-// Sqlizer returns a prepared statement.
+// Sqlizer represents a prepared statement.
 type Sqlizer interface {
 	ToSQL() (string, []any, error)
 }
 
-// SQL takes a template with placeholders into which expressions can be compiled.
-// Expressions can be of type Sqlizer or []Sqlizer.
-// []Sqlizer gets joined to an Expression with ", " as separator.
-// []any is compiled to an array of placeholders [ (?, ?) ].
-// [][]any is compiled to an array of values [ (?, ?), (?, ?) ].
-// All other values will be put into the arguments of a prepared statement.
+// Compile takes a template with placeholders into which expressions can be compiled.
 // You can escape '?' by using '??'.
-func SQL(template string, expressions ...any) Expression {
+func Compile(template string, expressions ...Sqlizer) Expression {
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(expressions))
 
@@ -46,6 +43,10 @@ func SQL(template string, expressions ...any) Expression {
 
 		exprIndex++
 
+		if expressions[exprIndex] == nil {
+			return Expression{Err: ErrInvalidExpression}
+		}
+
 		if exprIndex >= len(expressions) {
 			return Expression{Err: ErrInvalidNumberOfArguments}
 		}
@@ -53,48 +54,7 @@ func SQL(template string, expressions ...any) Expression {
 		builder.WriteString(template[:index])
 		template = template[index+1:]
 
-		var (
-			sql  string
-			args []any
-			err  error
-		)
-
-		switch expr := expressions[exprIndex].(type) {
-		case Sqlizer:
-			sql, args, err = expr.ToSQL()
-		case []Sqlizer:
-			sql, args, err = Join(", ", expr...).ToSQL()
-		case []Expression:
-			arr := make([]Sqlizer, len(expr))
-
-			for i := range arr {
-				arr[i] = expr[i]
-			}
-
-			sql, args, err = Join(", ", arr...).ToSQL()
-		case []any:
-			if len(expr) == 0 {
-				return Expression{Err: ErrInvalidExpression}
-			}
-
-			sql = "(" + strings.Repeat(", ?", len(expr))[2:] + ")"
-			args = expr
-		case [][]any:
-			arr := make([]Sqlizer, len(expr))
-
-			for index := range arr {
-				if index != 0 {
-					sql += ", "
-				}
-
-				sql += "(" + strings.Repeat(", ?", len(expr[index]))[2:] + ")"
-				args = append(args, expr[index]...)
-			}
-		default:
-			sql = "?"
-			args = []any{expr}
-		}
-
+		sql, args, err := expressions[exprIndex].ToSQL()
 		if err != nil {
 			return Expression{Err: err}
 		}
@@ -115,6 +75,11 @@ func SQL(template string, expressions ...any) Expression {
 	return Expression{SQL: builder.String(), Args: arguments}
 }
 
+// SQL returns an expression.
+func SQL(sql string, args ...any) Expression {
+	return Expression{SQL: sql, Args: args}
+}
+
 // Append builds an Expression by appending Sqlizer's.
 func Append(expressions ...Sqlizer) Expression {
 	return Join("", expressions...)
@@ -129,7 +94,7 @@ func Join(sep string, expressions ...Sqlizer) Expression {
 
 	for _, expr := range expressions {
 		if expr == nil {
-			continue
+			return Expression{Err: ErrInvalidExpression}
 		}
 
 		sql, args, err := expr.ToSQL()
@@ -142,9 +107,9 @@ func Join(sep string, expressions ...Sqlizer) Expression {
 		}
 
 		if isFirst {
-			isFirst = false
-
 			builder.WriteString(sql)
+
+			isFirst = false
 		} else {
 			builder.WriteString(sep + sql)
 		}
@@ -155,8 +120,8 @@ func Join(sep string, expressions ...Sqlizer) Expression {
 	return Expression{SQL: builder.String(), Args: arguments}
 }
 
-// If returns then if condition is true.
-// If the condition is false, an empty Expression is returned.
+// If returns an expression based on a condition.
+// If false an empty expression is returned.
 func If(condition bool, then Sqlizer) Expression {
 	if condition {
 		return toExpression(then)
@@ -165,13 +130,63 @@ func If(condition bool, then Sqlizer) Expression {
 	return Expression{}
 }
 
-// IfElse returns then Sqlizer on true and els on false as Expression.
+// IfElse returns an expression based on a condition.
 func IfElse(condition bool, then, els Sqlizer) Expression {
 	if condition {
 		return toExpression(then)
 	}
 
 	return toExpression(els)
+}
+
+// Idents joins idents with ", " to an expression.
+func Idents(idents ...string) Expression {
+	return Expression{SQL: strings.Join(idents, ", ")}
+}
+
+// Value returns an expression with a placeholder.
+func Value(a any) Expression {
+	return Expression{SQL: "?", Args: []any{a}}
+}
+
+// Values returns an expression with placeholders.
+func Values(a ...any) Expression {
+	return Expression{SQL: fmt.Sprintf("(%s)", strings.Repeat(", ?", len(a))[2:]), Args: a}
+}
+
+// Equals returns an expression with an '=' sign.
+func Equals(ident string, value any) Expression {
+	return Expression{SQL: ident + " = ?", Args: []any{value}}
+}
+
+// NotEquals returns an expression with an '<>' sign.
+func NotEquals(ident string, value any) Expression {
+	return Expression{SQL: ident + " <> ?", Args: []any{value}}
+}
+
+// Greater returns an expression with an '>' sign.
+func Greater(ident string, value any) Expression {
+	return Expression{SQL: ident + " > ?", Args: []any{value}}
+}
+
+// GreaterOrEquals returns an expression with an '>=' sign.
+func GreaterOrEquals(ident string, value any) Expression {
+	return Expression{SQL: ident + " >= ?", Args: []any{value}}
+}
+
+// Less returns an expression with an '<' sign.
+func Less(ident string, value any) Expression {
+	return Expression{SQL: ident + " < ?", Args: []any{value}}
+}
+
+// LessOrEquals returns an expression with an '<=' sign.
+func LessOrEquals(ident string, value any) Expression {
+	return Expression{SQL: ident + " <= ?", Args: []any{value}}
+}
+
+// In returns an expression with an 'IN' sign.
+func In(ident string, values ...any) Expression {
+	return Expression{SQL: fmt.Sprintf("%s IN (%s)", ident, strings.Repeat(", ?", len(values))[2:]), Args: values}
 }
 
 func toExpression(expr Sqlizer) Expression {
@@ -203,48 +218,34 @@ func (e Expression) ToSQL() (string, []any, error) {
 	return e.SQL, e.Args, e.Err
 }
 
-// Columns in a Sqlizer that joins a list of identifiers with ", ".
-type Columns []string
-
-// ToSQL is the implementation of the Sqlizer interface.
-func (c Columns) ToSQL() (string, []any, error) {
-	return strings.Join(c, ", "), nil, nil
-}
-
-// ToPostgres transforms a Sqlizer to a valid postgres statement.
-func ToPostgres(expr Sqlizer) (string, []any, error) {
-	sql, args, err := expr.ToSQL()
-	if err != nil {
-		return "", nil, err
-	}
-
+func (e Expression) ToPositional(placeholder string) (string, []any, error) {
 	build := &strings.Builder{}
 	argIndex := -1
 
 	for {
-		index := strings.IndexRune(sql, '?')
+		index := strings.IndexRune(e.SQL, '?')
 		if index < 0 {
-			build.WriteString(sql)
+			build.WriteString(e.SQL)
 
 			break
 		}
 
-		if index < len(sql)-1 && sql[index+1] == '?' {
-			build.WriteString(sql[:index+1])
-			sql = sql[index+2:]
+		if index < len(e.SQL)-1 && e.SQL[index+1] == '?' {
+			build.WriteString(e.SQL[:index+1])
+			e.SQL = e.SQL[index+2:]
 
 			continue
 		}
 
 		argIndex++
 
-		build.WriteString(fmt.Sprintf("%s$%d", sql[:index], argIndex+1))
-		sql = sql[index+1:]
+		build.WriteString(fmt.Sprintf("%s%s%d", e.SQL[:index], placeholder, argIndex+1))
+		e.SQL = e.SQL[index+1:]
 	}
 
-	if argIndex != len(args)-1 {
+	if argIndex != len(e.Args)-1 {
 		return "", nil, ErrInvalidNumberOfArguments
 	}
 
-	return build.String(), args, nil
+	return build.String(), e.Args, nil
 }

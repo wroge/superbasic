@@ -11,7 +11,7 @@ func TestInsert(t *testing.T) {
 	t.Parallel()
 
 	insert := superbasic.Compile("INSERT INTO presidents (?) VALUES ? RETURNING id",
-		superbasic.Idents("id", "first", "last"),
+		superbasic.Idents("nr", "first", "last"),
 		superbasic.Join(", ",
 			superbasic.Values(46, "Joe", "Biden"),
 			superbasic.Values(45, "Donald", "trump"),
@@ -27,7 +27,7 @@ func TestInsert(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "INSERT INTO presidents (id, first, last) VALUES"+
+	if sql != "INSERT INTO presidents (nr, first, last) VALUES"+
 		" ($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12),"+
 		" ($13, $14, $15), ($16, $17, $18) RETURNING id" || len(args) != 18 {
 		t.Fatal(sql, args)
@@ -42,7 +42,7 @@ func TestUpdate(t *testing.T) {
 			superbasic.Equals("first", "Donald"),
 			superbasic.Equals("last", "Trump"),
 		),
-		superbasic.Equals("id", 45),
+		superbasic.Equals("nr", 45),
 	)
 
 	sql, args, err := update.ToSQL()
@@ -50,7 +50,7 @@ func TestUpdate(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "UPDATE presidents SET first = ?, last = ? WHERE id = ?" || len(args) != 3 {
+	if sql != "UPDATE presidents SET first = ?, last = ? WHERE nr = ?" || len(args) != 3 {
 		t.Fatal(sql, args)
 	}
 }
@@ -60,12 +60,12 @@ func TestQuery(t *testing.T) {
 
 	search := superbasic.And(
 		superbasic.In("last", "Bush", "Clinton"),
-		superbasic.Not(superbasic.Greater("id", 42)),
+		superbasic.Not(superbasic.Greater("nr", 42)),
 	)
 	sort := "first"
 
 	query := superbasic.Append(
-		superbasic.SQL("SELECT id, first, last FROM presidents"),
+		superbasic.SQL("SELECT nr, first, last FROM presidents"),
 		superbasic.If(search != nil, superbasic.Compile(" WHERE ?", search)),
 		superbasic.If(sort != "", superbasic.SQL(fmt.Sprintf(" ORDER BY %s", sort))),
 	)
@@ -75,7 +75,7 @@ func TestQuery(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "SELECT id, first, last FROM presidents WHERE last IN (?, ?) AND NOT (id > ?) ORDER BY first" ||
+	if sql != "SELECT nr, first, last FROM presidents WHERE last IN (?, ?) AND NOT (nr > ?) ORDER BY first" ||
 		len(args) != 3 {
 		t.Fatal(sql, args)
 	}

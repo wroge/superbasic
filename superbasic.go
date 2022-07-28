@@ -214,9 +214,49 @@ func LessOrEquals(ident string, value any) Expression {
 	return expression{sql: ident + " <= ?", args: []any{value}}
 }
 
-// In returns an expression with an 'IN' sign.
+// In returns a IN expression.
 func In(ident string, values ...any) Expression {
 	return expression{sql: fmt.Sprintf("%s IN (%s)", ident, strings.Repeat(", ?", len(values))[2:]), args: values}
+}
+
+// NotIn returns a NOT IN expression.
+func NotIn(ident string, values ...any) Expression {
+	return expression{sql: fmt.Sprintf("%s NOT IN (%s)", ident, strings.Repeat(", ?", len(values))[2:]), args: values}
+}
+
+// IsNull returns a IS NULL expression.
+func IsNull(ident string) Expression {
+	return expression{sql: fmt.Sprintf("%s IS NULL", ident)}
+}
+
+// IsNotNull returns a IS NOT NULL expression.
+func IsNotNull(ident string) Expression {
+	return expression{sql: fmt.Sprintf("%s IS NOT NULL", ident)}
+}
+
+// Between returns a BETWEEN expression.
+func Between(ident string, lower, higher any) Expression {
+	return expression{sql: fmt.Sprintf("%s BETWEEN ? AND ?", ident), args: []any{lower, higher}}
+}
+
+// NotBetween returns a NOT BETWEEN expression.
+func NotBetween(ident string, lower, higher any) Expression {
+	return expression{sql: fmt.Sprintf("%s NOT BETWEEN ? AND ?", ident), args: []any{lower, higher}}
+}
+
+// Like returns a LIKE expression.
+func Like(ident string, value any) Expression {
+	return expression{sql: fmt.Sprintf("%s LIKE ?", ident), args: []any{value}}
+}
+
+// NotLike returns a NOT LIKE expression.
+func NotLike(ident string, value any) Expression {
+	return expression{sql: fmt.Sprintf("%s NOT LIKE ?", ident), args: []any{value}}
+}
+
+// Cast returns a CAST expression.
+func Cast(value any, as string) Expression {
+	return expression{sql: fmt.Sprintf("CAST(? AS %s)", as), args: []any{value}}
 }
 
 type expression struct {

@@ -20,7 +20,7 @@ type Expression interface {
 
 
 insert := superbasic.Compile("INSERT INTO presidents (?) VALUES ? RETURNING id",
-	superbasic.Idents("id", "first", "last"),
+	superbasic.Idents("nr", "first", "last"),
 	superbasic.Join(", ",
 		superbasic.Values(46, "Joe", "Biden"),
 		superbasic.Values(45, "Donald", "trump"),
@@ -32,7 +32,7 @@ insert := superbasic.Compile("INSERT INTO presidents (?) VALUES ? RETURNING id",
 )
 
 fmt.Println(superbasic.ToPositional("$", insert))
-// INSERT INTO presidents (id, first, last) VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12), ($13, $14, $15), ($16, $17, $18) RETURNING id
+// INSERT INTO presidents (nr, first, last) VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12), ($13, $14, $15), ($16, $17, $18) RETURNING id
 // [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush]
 
 
@@ -41,11 +41,11 @@ update := superbasic.Compile("UPDATE presidents SET ? WHERE ?",
 		superbasic.Equals("first", "Donald"),
 		superbasic.Equals("last", "Trump"),
 	),
-	superbasic.Equals("id", 45),
+	superbasic.Equals("nr", 45),
 )
 
 fmt.Println(update.ToSQL())
-// UPDATE presidents SET first = ?, last = ? WHERE id = ?
+// UPDATE presidents SET first = ?, last = ? WHERE nr = ?
 // [Donald Trump 45]
 
 

@@ -12,7 +12,7 @@ In addition, this package provides a set of functions that can be used to create
 ```go
 go get github.com/wroge/superbasic
 
-// []Expression is compiled to Join(", ", expr...).  
+// []Expression is compiled to Join(sep, expr...). (default sep is ", ")
 // []any is compiled to (?, ?).  
 // [][]any is compiled to (?, ?), (?, ?).  
 // Escape '?' by using '??'.

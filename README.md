@@ -67,7 +67,8 @@ fmt.Println(query.ToSQL())
 
 ## Query Builders
 
-These query builders are a few examples of how you can create your own expressions. See the documentation for that.
+These query builders are a few examples of how you can create your own expressions.
+See the [code](https://github.com/wroge/superbasic/blob/main/superbasic.go#L331) for that.
 
 ```go
 

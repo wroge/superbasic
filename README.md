@@ -113,6 +113,6 @@ expr := superbasic.Delete("presidents").
 	Where(superbasic.EqualsIdent("last", "Bush"))
 
 fmt.Println(expr.ToSQL())
-// DELETE FROM ? WHERE last = ? 
+// DELETE FROM presidents WHERE last = ? 
 // [presidents Bush]
 ```

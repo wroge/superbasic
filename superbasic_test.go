@@ -450,7 +450,7 @@ func TestDeleteBuilder(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "DELETE FROM ? WHERE last = ?" {
+	if sql != "DELETE FROM presidents WHERE last = ?" {
 		t.Fatal(sql, args)
 	}
 }

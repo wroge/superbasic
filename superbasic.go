@@ -508,7 +508,7 @@ type DeleteBuilder struct {
 
 func (db *DeleteBuilder) ToSQL() (string, []any, error) {
 	return Append(
-		SQL("DELETE FROM ?", db.from),
+		SQL(fmt.Sprintf("DELETE FROM %s", db.from)),
 		If(db.where != nil, SQL(" WHERE ?", db.where)),
 	).ToSQL()
 }

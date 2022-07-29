@@ -62,4 +62,56 @@ query := superbasic.Append(
 fmt.Println(query.ToSQL())
 // SELECT nr, first, last FROM presidents WHERE last IN (?, ?) AND NOT (nr > ?) ORDER BY first
 // [Bush Clinton 42]
+
+```
+
+# Query Builders
+
+These query builders are a few examples of how you can create your own expressions. See the documentation for that.
+
+```go
+
+query := superbasic.SelectSQL("nr, first, last").
+	FromSQL("presidents").
+	Where(superbasic.Or(
+		superbasic.EqualsIdent("last", "Bush"),
+		superbasic.GreaterIdent("nr", 44),
+	)).
+	Limit(3)
+
+fmt.Println(query.ToSQL())
+// SELECT nr, first, last FROM presidents WHERE (last = ? OR nr > ?)
+// [Bush 44]
+
+
+insert := superbasic.Insert("presidents").
+	Columns("nr", "first", "last").
+	AddRow(46, "Joe", "Biden").
+	AddRow(45, "Donald", "trump").
+	AddRow(44, "Barack", "Obama").
+	AddRow(43, "George W.", "Bush").
+	AddRow(42, "Bill", "Clinton").
+	AddRow(41, "George H. W.", "Bush")
+
+fmt.Println(insert.ToSQL())
+// INSERT INTO presidents (nr, first, last) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?) 
+// [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush]
+
+
+update := superbasic.Update("presidents").
+	AddSet(superbasic.EqualsIdent("first", "Donald")).
+	AddSetSQL("last = ?", "Trump").
+	Where(superbasic.EqualsIdent("nr", 45))
+
+fmt.Println(update.ToSQL())
+// UPDATE presidents SET first = ?, last = ? WHERE nr = ? 
+// [Donald Trump 45]
+
+
+expr := superbasic.Delete("presidents").
+	Where(superbasic.EqualsIdent("last", "Bush"))
+
+fmt.Println(expr.ToSQL())
+// DELETE FROM ? WHERE last = ? 
+// [presidents Bush]
 ```

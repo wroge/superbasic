@@ -49,7 +49,7 @@ func compile(sep string, expression any) (string, []any, error) {
 }
 
 // SQL takes a template with placeholders into which expressions can be compiled.
-// Expression []Expression is compiled to Join(", ", expr...).
+// []Expression is compiled to Join(sep, expr...). (default sep is ", ")
 // Expression []any is compiled to (?, ?).
 // Expression [][]any is compiled to (?, ?), (?, ?).
 // Escape '?' by using '??'.
@@ -280,7 +280,7 @@ func IsNotNullIdent(ident string) Expression {
 
 // Between returns a BETWEEN expression.
 func Between(expr, lower, higher any) Expression {
-	return SQL("? BETWEEN ? ANY ?", expr, lower, higher)
+	return SQL("? BETWEEN ? AND ?", expr, lower, higher)
 }
 
 // BetweenIdent returns a BETWEEN expression.
@@ -290,7 +290,7 @@ func BetweenIdent(ident string, lower, higher any) Expression {
 
 // NotBetween returns a NOT BETWEEN expression.
 func NotBetween(expr, lower, higher any) Expression {
-	return SQL("? NOT BETWEEN ? ANY ?", expr, lower, higher)
+	return SQL("? NOT BETWEEN ? AND ?", expr, lower, higher)
 }
 
 // NotBetweenIdent returns a NOT BETWEEN expression.
@@ -326,6 +326,201 @@ func Cast(expr any, as string) Expression {
 // CastIdent returns a CAST expression.
 func CastIdent(ident string, as string) Expression {
 	return Cast(SQL(ident), as)
+}
+
+func SelectSQL(sql string, args ...any) *SelectBuilder {
+	return Select(SQL(sql, args...))
+}
+
+func Select(expr any) *SelectBuilder {
+	return &SelectBuilder{
+		sel: expr,
+	}
+}
+
+type SelectBuilder struct {
+	sel     any
+	from    any
+	where   any
+	groupBy any
+	having  any
+	orderBy any
+	limit   uint64
+	offset  uint64
+}
+
+func (sb *SelectBuilder) ToSQL() (string, []any, error) {
+	return Append(
+		IfElse(sb.sel != nil, SQL("SELECT ?", sb.sel), SQL("SELECT *")),
+		If(sb.from != nil, SQL(" FROM ?", sb.from)),
+		If(sb.where != nil, SQL(" WHERE ?", sb.where)),
+		If(sb.groupBy != nil, SQL(" GROUP BY ?", sb.groupBy)),
+		If(sb.having != nil, SQL(" HAVING ?", sb.having)),
+		If(sb.orderBy != nil, SQL(" ORDER BY ?", sb.orderBy)),
+		If(sb.limit > 0, SQL(fmt.Sprintf(" LIMIT %d", sb.limit))),
+		If(sb.offset > 0, SQL(fmt.Sprintf(" OFFSET %d", sb.offset))),
+	).ToSQL()
+}
+
+func (sb *SelectBuilder) FromSQL(sql string, args ...any) *SelectBuilder {
+	return sb.From(SQL(sql, args...))
+}
+
+func (sb *SelectBuilder) From(expr any) *SelectBuilder {
+	sb.from = expr
+
+	return sb
+}
+
+func (sb *SelectBuilder) WhereSQL(sql string, args ...any) *SelectBuilder {
+	return sb.Where(SQL(sql, args...))
+}
+
+func (sb *SelectBuilder) Where(expr any) *SelectBuilder {
+	sb.where = expr
+
+	return sb
+}
+
+func (sb *SelectBuilder) GroupBySQL(sql string, args ...any) *SelectBuilder {
+	return sb.GroupBy(SQL(sql, args...))
+}
+
+func (sb *SelectBuilder) GroupBy(expr any) *SelectBuilder {
+	sb.groupBy = expr
+
+	return sb
+}
+
+func (sb *SelectBuilder) HavingSQL(sql string, args ...any) *SelectBuilder {
+	return sb.Having(SQL(sql, args...))
+}
+
+func (sb *SelectBuilder) Having(expr any) *SelectBuilder {
+	sb.having = expr
+
+	return sb
+}
+
+func (sb *SelectBuilder) OrderBySQL(sql string, args ...any) *SelectBuilder {
+	return sb.OrderBy(SQL(sql, args...))
+}
+
+func (sb *SelectBuilder) OrderBy(expr any) *SelectBuilder {
+	sb.orderBy = expr
+
+	return sb
+}
+
+func (sb *SelectBuilder) Limit(limit uint64) *SelectBuilder {
+	sb.limit = limit
+
+	return sb
+}
+
+func (sb *SelectBuilder) Offset(offset uint64) *SelectBuilder {
+	sb.offset = offset
+
+	return sb
+}
+
+func Insert(into string) *InsertBuilder {
+	return &InsertBuilder{
+		into: into,
+	}
+}
+
+type InsertBuilder struct {
+	into    string
+	columns []string
+	data    [][]any
+}
+
+func (ib *InsertBuilder) ToSQL() (string, []any, error) {
+	return Append(
+		SQL(fmt.Sprintf("INSERT INTO %s", ib.into)),
+		If(len(ib.columns) > 0, SQL(fmt.Sprintf(" (%s)", strings.Join(ib.columns, ", ")))),
+		SQL(" VALUES ?", ib.data),
+	).ToSQL()
+}
+
+func (ib *InsertBuilder) Columns(columns ...string) *InsertBuilder {
+	ib.columns = columns
+
+	return ib
+}
+
+func (ib *InsertBuilder) AddRow(values ...any) *InsertBuilder {
+	ib.data = append(ib.data, values)
+
+	return ib
+}
+
+func Update(table string) *UpdateBuilder {
+	return &UpdateBuilder{
+		table: table,
+	}
+}
+
+type UpdateBuilder struct {
+	table string
+	sets  []any
+	where any
+}
+
+func (ub *UpdateBuilder) ToSQL() (string, []any, error) {
+	return Append(
+		SQL(fmt.Sprintf("UPDATE %s SET ?", ub.table), Join(", ", ub.sets...)),
+		If(ub.where != nil, SQL(" WHERE ?", ub.where)),
+	).ToSQL()
+}
+
+func (ub *UpdateBuilder) AddSetSQL(sql string, args ...any) *UpdateBuilder {
+	return ub.AddSet(SQL(sql, args...))
+}
+
+func (ub *UpdateBuilder) AddSet(set any) *UpdateBuilder {
+	ub.sets = append(ub.sets, set)
+
+	return ub
+}
+
+func (ub *UpdateBuilder) WhereSQL(sql string, args ...any) *UpdateBuilder {
+	return ub.Where(SQL(sql, args...))
+}
+
+func (ub *UpdateBuilder) Where(expr any) *UpdateBuilder {
+	ub.where = expr
+
+	return ub
+}
+
+func Delete(from string) *DeleteBuilder {
+	return &DeleteBuilder{
+		from: from,
+	}
+}
+
+type DeleteBuilder struct {
+	from  string
+	where any
+}
+
+func (db *DeleteBuilder) ToSQL() (string, []any, error) {
+	return Append(
+		SQL("DELETE FROM ?", db.from),
+		If(db.where != nil, SQL(" WHERE ?", db.where)),
+	).ToSQL()
+}
+
+func (db *DeleteBuilder) WhereSQL(sql string, args ...any) *DeleteBuilder {
+	return db.Where(SQL(sql, args...))
+}
+
+func (db *DeleteBuilder) Where(expr any) *DeleteBuilder {
+	db.where = expr
+
+	return db
 }
 
 type expression struct {

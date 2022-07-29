@@ -65,7 +65,7 @@ fmt.Println(query.ToSQL())
 
 ```
 
-# Query Builders
+## Query Builders
 
 These query builders are a few examples of how you can create your own expressions. See the documentation for that.
 

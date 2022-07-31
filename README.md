@@ -35,4 +35,4 @@ https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2a
 Additionally, there are other query builders (Insert, Update, Delete) that can be used to create prepared statements.
 
 
-https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L78-L790
+https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L78-L90

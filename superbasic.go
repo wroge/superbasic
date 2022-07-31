@@ -28,7 +28,6 @@ func (e ExpressionError) ToSQL() (string, []any, error) {
 	return "", nil, e
 }
 
-// Expression represents a prepared statement.
 type Expression interface {
 	ToSQL() (string, []any, error)
 }
@@ -59,7 +58,7 @@ func Values(values ...any) Expression {
 }
 
 // SQL takes a template with placeholders into which expressions can be compiled.
-// []Expression is compiled to Join(sep, expr...). (default sep is ", ")
+// []Expression is compiled to Join(", ", expr...).
 // Expression []any is compiled to (?, ?).
 // Expression [][]any is compiled to (?, ?), (?, ?).
 // Escape '?' by using '??'.
@@ -114,12 +113,10 @@ func SQL(sql string, expressions ...any) Expression {
 	return expression{sql: builder.String(), args: arguments}
 }
 
-// Append expressions.
 func Append(expressions ...Expression) Expression {
 	return Join("", expressions...)
 }
 
-// Join joins expressions by a separator.
 func Join(sep string, expressions ...Expression) Expression {
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(expressions))
@@ -154,8 +151,6 @@ func Join(sep string, expressions ...Expression) Expression {
 	return expression{sql: builder.String(), args: arguments}
 }
 
-// If returns an expression based on a condition.
-// If false an empty expression is returned.
 func If(condition bool, then any) Expression {
 	if condition {
 		return SQL("?", then)
@@ -164,7 +159,6 @@ func If(condition bool, then any) Expression {
 	return expression{}
 }
 
-// IfElse returns an expression based on a condition.
 func IfElse(condition bool, then, els any) Expression {
 	if condition {
 		return SQL("?", then)
@@ -173,167 +167,134 @@ func IfElse(condition bool, then, els any) Expression {
 	return SQL("?", els)
 }
 
-// And returns a AND expression.
 func And(expr ...Expression) Expression {
 	return Join(" AND ", expr...)
 }
 
-// Or returns a OR expression.
 func Or(left, right Expression) Expression {
 	return SQL("(? OR ?)", left, right)
 }
 
-// Not returns a NOT expression.
 func Not(expr Expression) Expression {
 	return SQL("NOT (?)", expr)
 }
 
-// Equals returns an expression with an '=' sign.
 func Equals(left, right any) Expression {
 	return SQL("? = ?", left, right)
 }
 
-// EqualsIdent returns an expression with an '=' sign.
 func EqualsIdent(ident string, value any) Expression {
 	return Equals(SQL(ident), value)
 }
 
-// NotEquals returns an expression with an '<>' sign.
 func NotEquals(left, right any) Expression {
 	return SQL("? <> ?", left, right)
 }
 
-// NotEqualsIdent returns an expression with an '<>' sign.
 func NotEqualsIdent(ident string, value any) Expression {
 	return NotEquals(SQL(ident), value)
 }
 
-// Greater returns an expression with an '>' sign.
 func Greater(left, right any) Expression {
 	return SQL("? > ?", left, right)
 }
 
-// GreaterIdent returns an expression with an '>' sign.
 func GreaterIdent(ident string, value any) Expression {
 	return Greater(SQL(ident), value)
 }
 
-// GreaterOrEquals returns an expression with an '>=' sign.
 func GreaterOrEquals(left, right any) Expression {
 	return SQL("? >= ?", left, right)
 }
 
-// GreaterOrEqualsIdent returns an expression with an '>=' sign.
 func GreaterOrEqualsIdent(ident string, value any) Expression {
 	return GreaterOrEquals(SQL(ident), value)
 }
 
-// Less returns an expression with an '<' sign.
 func Less(left, right any) Expression {
 	return SQL("? < ?", left, right)
 }
 
-// LessIdent returns an expression with an '<' sign.
 func LessIdent(ident string, value any) Expression {
 	return Less(SQL(ident), value)
 }
 
-// LessOrEquals returns an expression with an '<=' sign.
 func LessOrEquals(left, right any) Expression {
 	return SQL("? <= ?", left, right)
 }
 
-// LessOrEqualsIdent returns an expression with an '<=' sign.
 func LessOrEqualsIdent(ident string, value any) Expression {
 	return LessOrEquals(SQL(ident), value)
 }
 
-// In returns a IN expression.
 func In(left, right any) Expression {
 	return SQL("? IN ?", left, right)
 }
 
-// InIdent returns a IN expression.
 func InIdent(ident string, value any) Expression {
 	return In(SQL(ident), value)
 }
 
-// NotIn returns a NOT IN expression.
 func NotIn(left, right any) Expression {
 	return SQL("? NOT IN ?", left, right)
 }
 
-// NotInIdent returns a NOT IN expression.
 func NotInIdent(ident string, value any) Expression {
 	return NotIn(SQL(ident), value)
 }
 
-// IsNull returns a IS NULL expression.
 func IsNull(expr any) Expression {
 	return SQL("? IS NULL", expr)
 }
 
-// IsNullIdent returns a IS NULL expression.
 func IsNullIdent(ident string) Expression {
 	return IsNull(SQL(ident))
 }
 
-// IsNotNull returns a IS NOT NULL expression.
 func IsNotNull(expr any) Expression {
 	return SQL("? IS NOT NULL", expr)
 }
 
-// IsNotNullIdent returns a IS NOT NULL expression.
 func IsNotNullIdent(ident string) Expression {
 	return IsNotNull(SQL(ident))
 }
 
-// Between returns a BETWEEN expression.
 func Between(expr, lower, higher any) Expression {
 	return SQL("? BETWEEN ? AND ?", expr, lower, higher)
 }
 
-// BetweenIdent returns a BETWEEN expression.
 func BetweenIdent(ident string, lower, higher any) Expression {
 	return Between(SQL(ident), lower, higher)
 }
 
-// NotBetween returns a NOT BETWEEN expression.
 func NotBetween(expr, lower, higher any) Expression {
 	return SQL("? NOT BETWEEN ? AND ?", expr, lower, higher)
 }
 
-// NotBetweenIdent returns a NOT BETWEEN expression.
 func NotBetweenIdent(ident string, lower, higher any) Expression {
 	return NotBetween(SQL(ident), lower, higher)
 }
 
-// Like returns a LIKE expression.
 func Like(left, right any) Expression {
 	return SQL("? LIKE ?", left, right)
 }
 
-// LikeIdent returns a LIKE expression.
 func LikeIdent(ident string, value any) Expression {
 	return Like(SQL(ident), value)
 }
 
-// NotLike returns a NOT LIKE expression.
 func NotLike(left, right any) Expression {
 	return SQL("? NOT LIKE ?", left, right)
 }
 
-// NotLikeIdent returns a LIKE expression.
 func NotLikeIdent(ident string, value any) Expression {
 	return NotLike(SQL(ident), value)
 }
 
-// Cast returns a CAST expression.
 func Cast(expr any, as string) Expression {
 	return SQL(fmt.Sprintf("CAST(? AS %s)", as), expr)
 }
 
-// CastIdent returns a CAST expression.
 func CastIdent(ident string, as string) Expression {
 	return Cast(SQL(ident), as)
 }

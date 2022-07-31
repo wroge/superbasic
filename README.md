@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/wroge/superbasic)](https://goreportcard.com/report/github.com/wroge/superbasic)
 ![golangci-lint](https://github.com/wroge/superbasic/workflows/golangci-lint/badge.svg)
 [![codecov](https://codecov.io/gh/wroge/superbasic/branch/main/graph/badge.svg?token=SBSedMOGHR)](https://codecov.io/gh/wroge/superbasic)
-[![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/sb.svg?style=social)](https://github.com/wroge/superbasic/tags)
+[![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/superbasic.svg?style=social)](https://github.com/wroge/superbasic/tags)
 
 This package compiles expressions and value-lists into SQL strings and thus offers an alternative to conventional query builders.
 

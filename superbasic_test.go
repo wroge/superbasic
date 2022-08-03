@@ -385,19 +385,21 @@ func TestPositional(t *testing.T) {
 func TestSelectBuilder(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.Select("select").
-		From("from").
-		Where("where").
-		GroupBy("group").
-		Having("having").
-		OrderBy("order").
-		Limit(1).
-		Offset(1).ToSQL()
+	sql, args, err := superbasic.Query{
+		Select:  superbasic.SQL("column"),
+		From:    superbasic.SQL("from"),
+		Where:   superbasic.SQL("where"),
+		GroupBy: superbasic.SQL("group"),
+		Having:  superbasic.SQL("having"),
+		OrderBy: superbasic.SQL("order"),
+		Limit:   1,
+		Offset:  1,
+	}.ToSQL()
 	if err != nil {
 		t.Error(err)
 	}
 
-	if sql != "SELECT select FROM from WHERE where GROUP BY group HAVING having ORDER BY order LIMIT 1 OFFSET 1" {
+	if sql != "SELECT column FROM from WHERE where GROUP BY group HAVING having ORDER BY order LIMIT 1 OFFSET 1" {
 		t.Fatal(sql, args)
 	}
 }
@@ -405,16 +407,18 @@ func TestSelectBuilder(t *testing.T) {
 func TestInsertBuilder(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.Insert("presidents").
-		Columns("nr", "first", "last").
-		Values(46, "Joe", "Biden").
-		Values(45, "Donald", "trump").
-		Values(44, "Barack", "Obama").
-		Values(43, "George W.", "Bush").
-		Values(42, "Bill", "Clinton").
-		Values(41, "George H. W.", "Bush").
-		ToSQL()
-
+	sql, args, err := superbasic.Insert{
+		Into:    "presidents",
+		Columns: []string{"nr", "first", "last"},
+		Data: [][]any{
+			{46, "Joe", "Biden"},
+			{45, "Donald", "trump"},
+			{44, "Barack", "Obama"},
+			{43, "George W.", "Bush"},
+			{42, "Bill", "Clinton"},
+			{41, "George H. W.", "Bush"},
+		},
+	}.ToSQL()
 	if err != nil {
 		t.Error(err)
 	}
@@ -428,10 +432,15 @@ func TestInsertBuilder(t *testing.T) {
 func TestUpdateBuilder(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.Update("presidents").
-		SetExpr(superbasic.EqualsIdent("first", "Donald")).
-		Set("last = ?", "Trump").
-		WhereExpr(superbasic.EqualsIdent("nr", 45)).ToSQL()
+	sql, args, err := superbasic.Update{
+		Table: "presidents",
+		Sets: []superbasic.Expression{
+			superbasic.EqualsIdent("first", "Donald"),
+			superbasic.SQL("last = ?", "Trump"),
+		},
+		Where: superbasic.EqualsIdent("nr", 45),
+	}.ToSQL()
+
 	if err != nil {
 		t.Error(err)
 	}
@@ -444,8 +453,11 @@ func TestUpdateBuilder(t *testing.T) {
 func TestDeleteBuilder(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.Delete("presidents").
-		WhereExpr(superbasic.EqualsIdent("last", "Bush")).ToSQL()
+	sql, args, err := superbasic.Delete{
+		From:  "presidents",
+		Where: superbasic.EqualsIdent("last", "Bush"),
+	}.ToSQL()
+
 	if err != nil {
 		t.Error(err)
 	}

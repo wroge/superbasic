@@ -299,209 +299,67 @@ func CastIdent(ident string, as string) Expression {
 	return Cast(SQL(ident), as)
 }
 
-func Select(sql string, args ...any) *SelectBuilder {
-	return SelectExpr(SQL(sql, args...))
+type Query struct {
+	Select  Expression
+	From    Expression
+	Where   Expression
+	GroupBy Expression
+	Having  Expression
+	OrderBy Expression
+	Limit   uint64
+	Offset  uint64
 }
 
-func SelectExpr(expr Expression) *SelectBuilder {
-	return &SelectBuilder{
-		sel: expr,
-	}
-}
-
-type SelectBuilder struct {
-	sel     Expression
-	from    Expression
-	where   Expression
-	groupBy Expression
-	having  Expression
-	orderBy Expression
-	limit   uint64
-	offset  uint64
-}
-
-func (sb *SelectBuilder) ToSQL() (string, []any, error) {
+func (q Query) ToSQL() (string, []any, error) {
 	return Join(" ",
-		IfElse(sb.sel != nil, SQL("SELECT ?", sb.sel), SQL("SELECT *")),
-		If(sb.from != nil, SQL("FROM ?", sb.from)),
-		If(sb.where != nil, SQL("WHERE ?", sb.where)),
-		If(sb.groupBy != nil, SQL("GROUP BY ?", sb.groupBy)),
-		If(sb.having != nil, SQL("HAVING ?", sb.having)),
-		If(sb.orderBy != nil, SQL("ORDER BY ?", sb.orderBy)),
-		If(sb.limit > 0, SQL(fmt.Sprintf("LIMIT %d", sb.limit))),
-		If(sb.offset > 0, SQL(fmt.Sprintf("OFFSET %d", sb.offset))),
+		IfElse(q.Select != nil, SQL("SELECT ?", q.Select), SQL("SELECT *")),
+		If(q.From != nil, SQL("FROM ?", q.From)),
+		If(q.Where != nil, SQL("WHERE ?", q.Where)),
+		If(q.GroupBy != nil, SQL("GROUP BY ?", q.GroupBy)),
+		If(q.Having != nil, SQL("HAVING ?", q.Having)),
+		If(q.OrderBy != nil, SQL("ORDER BY ?", q.OrderBy)),
+		If(q.Limit > 0, SQL(fmt.Sprintf("LIMIT %d", q.Limit))),
+		If(q.Offset > 0, SQL(fmt.Sprintf("OFFSET %d", q.Offset))),
 	).ToSQL()
 }
 
-func (sb *SelectBuilder) Select(sql string, args ...any) *SelectBuilder {
-	return sb.SelectExpr(SQL(sql, args...))
+type Insert struct {
+	Into    string
+	Columns []string
+	Data    [][]any
 }
 
-func (sb *SelectBuilder) SelectExpr(expr Expression) *SelectBuilder {
-	sb.sel = expr
-
-	return sb
-}
-
-func (sb *SelectBuilder) From(sql string, args ...any) *SelectBuilder {
-	return sb.FromExpr(SQL(sql, args...))
-}
-
-func (sb *SelectBuilder) FromExpr(expr Expression) *SelectBuilder {
-	sb.from = expr
-
-	return sb
-}
-
-func (sb *SelectBuilder) Where(sql string, args ...any) *SelectBuilder {
-	return sb.WhereExpr(SQL(sql, args...))
-}
-
-func (sb *SelectBuilder) WhereExpr(expr Expression) *SelectBuilder {
-	sb.where = expr
-
-	return sb
-}
-
-func (sb *SelectBuilder) GroupBy(sql string, args ...any) *SelectBuilder {
-	return sb.GroupByExpr(SQL(sql, args...))
-}
-
-func (sb *SelectBuilder) GroupByExpr(expr Expression) *SelectBuilder {
-	sb.groupBy = expr
-
-	return sb
-}
-
-func (sb *SelectBuilder) Having(sql string, args ...any) *SelectBuilder {
-	return sb.HavingExpr(SQL(sql, args...))
-}
-
-func (sb *SelectBuilder) HavingExpr(expr Expression) *SelectBuilder {
-	sb.having = expr
-
-	return sb
-}
-
-func (sb *SelectBuilder) OrderBy(sql string, args ...any) *SelectBuilder {
-	return sb.OrderByExpr(SQL(sql, args...))
-}
-
-func (sb *SelectBuilder) OrderByExpr(expr Expression) *SelectBuilder {
-	sb.orderBy = expr
-
-	return sb
-}
-
-func (sb *SelectBuilder) Limit(limit uint64) *SelectBuilder {
-	sb.limit = limit
-
-	return sb
-}
-
-func (sb *SelectBuilder) Offset(offset uint64) *SelectBuilder {
-	sb.offset = offset
-
-	return sb
-}
-
-func Insert(into string) *InsertBuilder {
-	return &InsertBuilder{
-		into: into,
-	}
-}
-
-type InsertBuilder struct {
-	into    string
-	columns []string
-	data    [][]any
-}
-
-func (ib *InsertBuilder) ToSQL() (string, []any, error) {
+func (i Insert) ToSQL() (string, []any, error) {
 	return Join(" ",
-		SQL(fmt.Sprintf("INSERT INTO %s", ib.into)),
-		If(len(ib.columns) > 0, SQL(fmt.Sprintf("(%s)", strings.Join(ib.columns, ", ")))),
-		SQL("VALUES ?", ib.data),
+		SQL(fmt.Sprintf("INSERT INTO %s", i.Into)),
+		If(len(i.Columns) > 0, SQL(fmt.Sprintf("(%s)", strings.Join(i.Columns, ", ")))),
+		SQL("VALUES ?", i.Data),
 	).ToSQL()
 }
 
-func (ib *InsertBuilder) Columns(columns ...string) *InsertBuilder {
-	ib.columns = columns
-
-	return ib
+type Update struct {
+	Table string
+	Sets  []Expression
+	Where Expression
 }
 
-func (ib *InsertBuilder) Values(values ...any) *InsertBuilder {
-	ib.data = append(ib.data, values)
-
-	return ib
-}
-
-func Update(table string) *UpdateBuilder {
-	return &UpdateBuilder{
-		table: table,
-	}
-}
-
-type UpdateBuilder struct {
-	table string
-	sets  []Expression
-	where Expression
-}
-
-func (ub *UpdateBuilder) ToSQL() (string, []any, error) {
+func (u Update) ToSQL() (string, []any, error) {
 	return Join(" ",
-		SQL(fmt.Sprintf("UPDATE %s SET ?", ub.table), Join(", ", ub.sets...)),
-		If(ub.where != nil, SQL("WHERE ?", ub.where)),
+		SQL(fmt.Sprintf("UPDATE %s SET ?", u.Table), Join(", ", u.Sets...)),
+		If(u.Where != nil, SQL("WHERE ?", u.Where)),
 	).ToSQL()
 }
 
-func (ub *UpdateBuilder) Set(sql string, args ...any) *UpdateBuilder {
-	return ub.SetExpr(SQL(sql, args...))
+type Delete struct {
+	From  string
+	Where Expression
 }
 
-func (ub *UpdateBuilder) SetExpr(set Expression) *UpdateBuilder {
-	ub.sets = append(ub.sets, set)
-
-	return ub
-}
-
-func (ub *UpdateBuilder) Where(sql string, args ...any) *UpdateBuilder {
-	return ub.WhereExpr(SQL(sql, args...))
-}
-
-func (ub *UpdateBuilder) WhereExpr(expr Expression) *UpdateBuilder {
-	ub.where = expr
-
-	return ub
-}
-
-func Delete(from string) *DeleteBuilder {
-	return &DeleteBuilder{
-		from: from,
-	}
-}
-
-type DeleteBuilder struct {
-	from  string
-	where Expression
-}
-
-func (db *DeleteBuilder) ToSQL() (string, []any, error) {
+func (d Delete) ToSQL() (string, []any, error) {
 	return Join(" ",
-		SQL(fmt.Sprintf("DELETE FROM %s", db.from)),
-		If(db.where != nil, SQL("WHERE ?", db.where)),
+		SQL(fmt.Sprintf("DELETE FROM %s", d.From)),
+		If(d.Where != nil, SQL("WHERE ?", d.Where)),
 	).ToSQL()
-}
-
-func (db *DeleteBuilder) Where(sql string, args ...any) *DeleteBuilder {
-	return db.WhereExpr(SQL(sql, args...))
-}
-
-func (db *DeleteBuilder) WhereExpr(expr Expression) *DeleteBuilder {
-	db.where = expr
-
-	return db
 }
 
 type expression struct {

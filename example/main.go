@@ -57,34 +57,30 @@ func main() {
 	// SELECT nr, first, last FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
 	// [Bush 44]
 
-	select_builder := &superbasic.SelectBuilder{}
-
-	if len(columns) > 0 {
-		select_builder.Select(strings.Join(columns, ", "))
+	query = superbasic.Query{
+		Select:  superbasic.SQL(strings.Join(columns, ", ")),
+		From:    superbasic.SQL("presidents"),
+		Where:   where,
+		OrderBy: superbasic.SQL("nr"),
 	}
-
-	select_builder.From("presidents")
-
-	if where != nil {
-		select_builder.WhereExpr(where)
-	}
-
-	select_builder.OrderBy("nr").Limit(3)
-
-	fmt.Println(select_builder.ToSQL())
+	fmt.Println(query.ToSQL())
 	// SELECT nr, first, last FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
 	// [Bush 44]
 
-	insert_builder := superbasic.Insert("presidents").
-		Columns("nr", "first", "last").
-		Values(46, "Joe", "Biden").
-		Values(45, "Donald", "trump").
-		Values(44, "Barack", "Obama").
-		Values(43, "George W.", "Bush").
-		Values(42, "Bill", "Clinton").
-		Values(41, "George H. W.", "Bush")
+	insert = superbasic.Insert{
+		Into:    "presidents",
+		Columns: []string{"nr", "first", "last"},
+		Data: [][]any{
+			{46, "Joe", "Biden"},
+			{45, "Donald", "trump"},
+			{44, "Barack", "Obama"},
+			{43, "George W.", "Bush"},
+			{42, "Bill", "Clinton"},
+			{41, "George H. W.", "Bush"},
+		},
+	}
 
-	fmt.Println(superbasic.Join(" ", insert_builder, superbasic.SQL("RETURNING id")).ToSQL())
+	fmt.Println(superbasic.Join(" ", insert, superbasic.SQL("RETURNING id")).ToSQL())
 	// INSERT INTO presidents (nr, first, last) VALUES
 	// 		(?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?) RETURNING id
 	// [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush]

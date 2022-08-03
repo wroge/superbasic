@@ -26,13 +26,13 @@ With this library it is particularly easy to create dynamic queries based on con
 
 https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L40-L58
 
-Of course you can do the same with an ordinary Select Builder.
+Of course you can do the same with this Query.
 
-https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L60-L76
+https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L60-L68
 
-### Insert Builder
+### Insert, Update, Delete
 
-Additionally, there are other query builders (Insert, Update, Delete) that can be used to create prepared statements.
+Additionally, there are Insert, Update and Delete helpers that can be used to create prepared statements.
 
 
-https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L78-L90
+https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L70-L86

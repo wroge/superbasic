@@ -28,11 +28,11 @@ https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2a
 
 Of course you can do the same with this Query.
 
-https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L60-L68
+https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L60-L69
 
 ### Insert, Update, Delete
 
 Additionally, there are Insert, Update and Delete helpers that can be used to create prepared statements.
 
 
-https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L70-L86
+https://github.com/wroge/superbasic/blob/4bc62cc1dd5773214783b8fa50647958038de2ab/example/main.go#L71-L87

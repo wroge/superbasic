@@ -62,6 +62,7 @@ func main() {
 		From:    superbasic.SQL("presidents"),
 		Where:   where,
 		OrderBy: superbasic.SQL("nr"),
+		Limit: 3,
 	}
 	fmt.Println(query.ToSQL())
 	// SELECT nr, first, last FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3

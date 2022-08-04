@@ -1,4 +1,4 @@
-//nolint:gofumpt,exhaustivestruct,exhaustruct
+//nolint:gofumpt
 package superbasic_test
 
 import (
@@ -401,7 +401,8 @@ func TestSelectBuilder(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "WITH with SELECT column FROM from WHERE where GROUP BY group HAVING having WINDOW window ORDER BY order LIMIT 1 OFFSET 1" {
+	if sql != "WITH with SELECT column FROM from WHERE where GROUP BY group HAVING having"+
+		" WINDOW window ORDER BY order LIMIT 1 OFFSET 1" {
 		t.Fatal(sql, args)
 	}
 }

@@ -386,11 +386,13 @@ func TestSelectBuilder(t *testing.T) {
 	t.Parallel()
 
 	sql, args, err := superbasic.Query{
+		With:    superbasic.SQL("with"),
 		Select:  superbasic.SQL("column"),
 		From:    superbasic.SQL("from"),
 		Where:   superbasic.SQL("where"),
 		GroupBy: superbasic.SQL("group"),
 		Having:  superbasic.SQL("having"),
+		Window:  superbasic.SQL("window"),
 		OrderBy: superbasic.SQL("order"),
 		Limit:   1,
 		Offset:  1,
@@ -399,7 +401,8 @@ func TestSelectBuilder(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sql != "SELECT column FROM from WHERE where GROUP BY group HAVING having ORDER BY order LIMIT 1 OFFSET 1" {
+	if sql != "WITH with SELECT column FROM from WHERE where GROUP BY group HAVING having"+
+		" WINDOW window ORDER BY order LIMIT 1 OFFSET 1" {
 		t.Fatal(sql, args)
 	}
 }

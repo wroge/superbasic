@@ -314,8 +314,9 @@ type Query struct {
 
 func (q Query) ToSQL() (string, []any, error) {
 	return Join(" ",
-		If(q.With != nil, q.With),
-		IfElse(q.Select != nil, SQL("SELECT ?", q.Select), SQL("SELECT *")),
+		If(q.With != nil, SQL("WITH ?", q.With)),
+		SQL("SELECT"),
+		IfElse(q.Select != nil, q.Select, SQL("*")),
 		If(q.From != nil, SQL("FROM ?", q.From)),
 		If(q.Where != nil, SQL("WHERE ?", q.Where)),
 		If(q.GroupBy != nil, SQL("GROUP BY ?", q.GroupBy)),

@@ -1,4 +1,4 @@
-//nolint:gofumpt
+//nolint:gofumpt,exhaustivestruct
 package superbasic_test
 
 import (

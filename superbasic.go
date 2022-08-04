@@ -300,11 +300,13 @@ func CastIdent(ident string, as string) Expression {
 }
 
 type Query struct {
+	With    Expression
 	Select  Expression
 	From    Expression
 	Where   Expression
 	GroupBy Expression
 	Having  Expression
+	Window  Expression
 	OrderBy Expression
 	Limit   uint64
 	Offset  uint64
@@ -312,11 +314,13 @@ type Query struct {
 
 func (q Query) ToSQL() (string, []any, error) {
 	return Join(" ",
+		If(q.With != nil, q.With),
 		IfElse(q.Select != nil, SQL("SELECT ?", q.Select), SQL("SELECT *")),
 		If(q.From != nil, SQL("FROM ?", q.From)),
 		If(q.Where != nil, SQL("WHERE ?", q.Where)),
 		If(q.GroupBy != nil, SQL("GROUP BY ?", q.GroupBy)),
 		If(q.Having != nil, SQL("HAVING ?", q.Having)),
+		If(q.Having != nil, SQL("WINDOW ?", q.Window)),
 		If(q.OrderBy != nil, SQL("ORDER BY ?", q.OrderBy)),
 		If(q.Limit > 0, SQL(fmt.Sprintf("LIMIT %d", q.Limit))),
 		If(q.Offset > 0, SQL(fmt.Sprintf("OFFSET %d", q.Offset))),

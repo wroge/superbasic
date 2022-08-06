@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/wroge/superbasic"
 )
@@ -38,32 +37,28 @@ func main() {
 	// UPDATE presidents SET first = ?, last = ? WHERE nr = ?
 	// [Donald Trump 45]
 
-	columns := []string{"nr", "first", "last"}
-
 	where := superbasic.SQL("(? OR ?)",
 		superbasic.SQL("last = ?", "Bush"),
 		superbasic.SQL("nr >= ?", 45),
 	)
 
-	builder := superbasic.Build().SQL("SELECT ").
-		IfElse(len(columns) > 0, superbasic.SQL(strings.Join(columns, ", ")), superbasic.SQL("*")).
-		SQL(" FROM presidents").
+	builder := superbasic.Build().
+		SQL("SELECT * FROM presidents").
 		If(where.SQL != "", superbasic.SQL(" WHERE ?", where)).
-		SQL(fmt.Sprintf(" ORDER BY %s", "nr")).SQL(fmt.Sprintf(" LIMIT %d", 3))
+		SQL(" ORDER BY nr LIMIT 3")
 
 	fmt.Println(builder.ToSQL())
-	// SELECT nr, first, last FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
+	// SELECT * FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
 	// [Bush 44]
 
 	query := superbasic.Query{
-		Select:  superbasic.SQL(strings.Join(columns, ", ")),
 		From:    superbasic.SQL("presidents"),
 		Where:   where,
 		OrderBy: superbasic.SQL("nr"),
 		Limit:   3,
 	}
 	fmt.Println(query.ToSQL())
-	// SELECT nr, first, last FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
+	// SELECT * FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
 	// [Bush 44]
 
 	insert := superbasic.Insert{

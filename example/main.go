@@ -1,3 +1,4 @@
+//nolint:forbidigo,gomnd,staticcheck,exhaustivestruct,funlen,exhaustruct,wsl
 package main
 
 import (

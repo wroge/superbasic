@@ -6,15 +6,15 @@
 [![codecov](https://codecov.io/gh/wroge/superbasic/branch/main/graph/badge.svg?token=SBSedMOGHR)](https://codecov.io/gh/wroge/superbasic)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/superbasic.svg?style=social)](https://github.com/wroge/superbasic/tags)
 
-This package compiles expressions into SQL strings and thus offers an alternative to conventional query builders.
+```superbasic.SQL``` compiles expressions into SQL strings and thus offers an alternative to conventional query builders.
 
 ### Compile Expressions into SQL
 
-In this example, a list of values is compiled into an SQL string.
+You can compile a list of values into an SQL string...
 
 https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L11-L26
 
-Arrays or slices of expressions are joined by a comma.
+or any other expression. Lists of expressions are always joined by a comma.
 
 https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L28-L38
 

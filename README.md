@@ -11,27 +11,26 @@ This package compiles expressions into SQL strings and thus offers an alternativ
 ### Compile Values into SQL
 
 In this example, a list of values is compiled into an SQL string.
-
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L12-L27
+https://github.com/wroge/superbasic/blob/fbfa678f9ca520aa7f58ea103f583774ccfd304b/example/main.go#L12-L27
 
 ### Compile Expressions into SQL
 
 Similarly, expressions can be compiled in place of placeholders, which offers many new possibilities to create prepared statements.
 
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L29-L39
+https://github.com/wroge/superbasic/blob/fbfa678f9ca520aa7f58ea103f583774ccfd304b/example/main.go#L29-L39
 
 ### Queries
 
 With this library it is particularly easy to create dynamic queries based on conditions. In this example, the WHERE-clause is only included if a corresponding expression exists.
 
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L41-L56
+https://github.com/wroge/superbasic/blob/fbfa678f9ca520aa7f58ea103f583774ccfd304b/example/main.go#L41-L56
 
 Of course you can do the same with this Query.
 
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L58-L67
+https://github.com/wroge/superbasic/blob/fbfa678f9ca520aa7f58ea103f583774ccfd304b/example/main.go#L58-L67
 
 ### Insert, Update, Delete
 
 Additionally, there are Insert, Update and Delete helpers that can be used to create prepared statements.
 
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L69-L85
+https://github.com/wroge/superbasic/blob/fbfa678f9ca520aa7f58ea103f583774ccfd304b/example/main.go#L69-L85

@@ -1,4 +1,4 @@
-//nolint:gomnd,exhaustivestruct,forbidigo,funlen,wsl,exhaustruct
+//nolint:gomnd,forbidigo,wsl
 package main
 
 import (
@@ -36,30 +36,6 @@ func main() {
 	fmt.Println(expr.ToSQL())
 	// UPDATE presidents SET first = ?, last = ? WHERE nr = ?
 	// [Donald Trump 45]
-
-	where := superbasic.SQL("(? OR ?)",
-		superbasic.SQL("last = ?", "Bush"),
-		superbasic.SQL("nr >= ?", 45),
-	)
-
-	builder := superbasic.Build().
-		SQL("SELECT * FROM presidents").
-		If(where.SQL != "", superbasic.SQL(" WHERE ?", where)).
-		SQL(" ORDER BY nr LIMIT 3")
-
-	fmt.Println(builder.ToSQL())
-	// SELECT * FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
-	// [Bush 44]
-
-	query := superbasic.Query{
-		From:    superbasic.SQL("presidents"),
-		Where:   where,
-		OrderBy: superbasic.SQL("nr"),
-		Limit:   3,
-	}
-	fmt.Println(query.ToSQL())
-	// SELECT * FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
-	// [Bush 44]
 
 	insert := superbasic.Insert{
 		Into:    "presidents",

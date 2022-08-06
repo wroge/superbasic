@@ -4,7 +4,6 @@ package superbasic_test
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/wroge/superbasic"
@@ -333,34 +332,6 @@ func TestDelete2(t *testing.T) {
 	}
 
 	if sql != "DELETE FROM presidents WHERE last = ?" {
-		t.Fatal(sql, args)
-	}
-}
-
-func TestBuilder(t *testing.T) {
-	t.Parallel()
-
-	columns := []string{"nr", "first", "last"}
-
-	where := superbasic.SQL("(? OR ?)",
-		superbasic.SQL("last = ?", "Bush"),
-		superbasic.SQL("nr >= ?", 45),
-	)
-
-	sql, args, err := superbasic.Build().SQL("SELECT ").
-		IfElse(len(columns) > 0, superbasic.SQL(strings.Join(columns, ", ")), superbasic.SQL("*")).
-		Space().
-		SQL("FROM presidents").
-		If(where.SQL != "", superbasic.SQL(" WHERE ?", where)).
-		Join(" ",
-			superbasic.SQL(fmt.Sprintf(" ORDER BY %s", "nr")),
-			superbasic.SQL(fmt.Sprintf("LIMIT %d", 3))).ToSQL()
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	if sql != "SELECT nr, first, last FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3" {
 		t.Fatal(sql, args)
 	}
 }

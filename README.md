@@ -10,8 +10,6 @@
 
 https://github.com/wroge/superbasic/blob/be7223bbef84a6db8515b838cda9a7cbc29d6a10/superbasic.go#L40-L42
 
-### Compile Expressions into SQL
-
 You can compile a list of values into an SQL string...
 
 https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L11-L26
@@ -20,18 +18,6 @@ or any other expression. Lists of expressions are always joined by a comma.
 
 https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L28-L38
 
-### Queries
-
-It is particularly easy to create dynamic queries based on conditions. Here, the WHERE-clause is only included if a corresponding expression exists.
-
-https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L40-L52
-
-Of course you can do the same with this minimalistic Query builder.
-
-https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L54-L62
-
-### Insert, Update, Delete
-
-Additionally, there are Insert, Update and Delete helpers that can be used to create prepared statements.
+Additionally, there are Query, Insert, Update and Delete helpers that can be used to create prepared statements.
 
 https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L64-L80

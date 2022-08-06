@@ -21,3 +21,7 @@ https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672f
 Additionally, there are Query, Insert, Update and Delete helpers that can be used to create prepared statements.
 
 https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/example/main.go#L40-L51
+
+The Query helper can be used as a reference to build your own expressions...
+
+https://github.com/wroge/superbasic/blob/91bc5df478e8ba0de9910628cac8ae8d54241fe4/superbasic.go#L165-L195

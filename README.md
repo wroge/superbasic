@@ -5,6 +5,7 @@
 ![golangci-lint](https://github.com/wroge/superbasic/workflows/golangci-lint/badge.svg)
 [![codecov](https://codecov.io/gh/wroge/superbasic/branch/main/graph/badge.svg?token=SBSedMOGHR)](https://codecov.io/gh/wroge/superbasic)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/superbasic.svg?style=social)](https://github.com/wroge/superbasic/tags)
+
 ```superbasic.SQL``` compiles expressions into SQL strings and thus offers an alternative to conventional query builders.
 
 https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/superbasic.go#L40-L42

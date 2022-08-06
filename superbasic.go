@@ -47,46 +47,55 @@ func (v Values) ToSQL() (string, []any, error) {
 	return fmt.Sprintf("(%s)", strings.Repeat(", ?", len(v))[2:]), v, nil
 }
 
-// SQL takes b template with placeholders into which expressions can be compiled.
+// Compile takes a template with placeholders into which expressions can be compiled.
 // []Expression is compiled to Join(", ", expr...).
 // Escape '?' by using '??'.
-func SQL(sql string, expressions ...any) Raw {
+func Compile(template string, expressions ...any) Compiler {
+	return Compiler{Template: template, Expressions: expressions}
+}
+
+type Compiler struct {
+	Template    string
+	Expressions []any
+}
+
+func (c Compiler) ToSQL() (string, []any, error) {
 	builder := &strings.Builder{}
-	arguments := make([]any, 0, len(expressions))
+	arguments := make([]any, 0, len(c.Expressions))
 
 	exprIndex := -1
 
 	for {
-		index := strings.IndexRune(sql, '?')
+		index := strings.IndexRune(c.Template, '?')
 		if index < 0 {
-			builder.WriteString(sql)
+			builder.WriteString(c.Template)
 
 			break
 		}
 
-		if index < len(sql)-1 && sql[index+1] == '?' {
-			builder.WriteString(sql[:index+2])
-			sql = sql[index+2:]
+		if index < len(c.Template)-1 && c.Template[index+1] == '?' {
+			builder.WriteString(c.Template[:index+2])
+			c.Template = c.Template[index+2:]
 
 			continue
 		}
 
 		exprIndex++
 
-		if exprIndex >= len(expressions) {
-			return Raw{Err: NumberOfArgumentsError{Got: exprIndex, Want: len(expressions)}}
+		if exprIndex >= len(c.Expressions) {
+			return "", nil, NumberOfArgumentsError{Got: exprIndex, Want: len(c.Expressions)}
 		}
 
-		if expressions[exprIndex] == nil {
-			return Raw{Err: ExpressionError{}}
+		if c.Expressions[exprIndex] == nil {
+			return "", nil, ExpressionError{}
 		}
 
-		builder.WriteString(sql[:index])
-		sql = sql[index+1:]
+		builder.WriteString(c.Template[:index])
+		c.Template = c.Template[index+1:]
 
-		sql, args, err := compile(expressions[exprIndex])
+		sql, args, err := compile(c.Expressions[exprIndex])
 		if err != nil {
-			return Raw{Err: err}
+			return "", nil, err
 		}
 
 		builder.WriteString(sql)
@@ -94,25 +103,27 @@ func SQL(sql string, expressions ...any) Raw {
 		arguments = append(arguments, args...)
 	}
 
-	if exprIndex >= len(expressions) {
-		return Raw{Err: NumberOfArgumentsError{Got: exprIndex, Want: len(expressions)}}
+	if exprIndex >= len(c.Expressions) {
+		return "", nil, NumberOfArgumentsError{Got: exprIndex, Want: len(c.Expressions)}
 	}
 
-	return Raw{SQL: builder.String(), Args: arguments}
+	return builder.String(), arguments, nil
 }
 
-type Append []Expression
-
-func (b Append) ToSQL() (string, []any, error) {
-	return Join{Expressions: b}.ToSQL()
+func Append(expressions ...Expression) Joiner {
+	return Joiner{Expressions: expressions}
 }
 
-type Join struct {
+func Join(sep string, expressions ...Expression) Joiner {
+	return Joiner{Sep: sep, Expressions: expressions}
+}
+
+type Joiner struct {
 	Sep         string
 	Expressions []Expression
 }
 
-func (j Join) ToSQL() (string, []any, error) {
+func (j Joiner) ToSQL() (string, []any, error) {
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(j.Expressions))
 
@@ -176,22 +187,19 @@ type Query struct {
 }
 
 func (q Query) ToSQL() (string, []any, error) {
-	return Join{
-		Sep: " ",
-		Expressions: []Expression{
-			If(q.With != nil, SQL("WITH ?", q.With)),
-			SQL("SELECT"),
-			IfElse(q.Select != nil, q.Select, SQL("*")),
-			If(q.From != nil, SQL("FROM ?", q.From)),
-			If(q.Where != nil, SQL("WHERE ?", q.Where)),
-			If(q.GroupBy != nil, SQL("GROUP BY ?", q.GroupBy)),
-			If(q.Having != nil, SQL("HAVING ?", q.Having)),
-			If(q.Having != nil, SQL("WINDOW ?", q.Window)),
-			If(q.OrderBy != nil, SQL("ORDER BY ?", q.OrderBy)),
-			If(q.Limit > 0, SQL(fmt.Sprintf("LIMIT %d", q.Limit))),
-			If(q.Offset > 0, SQL(fmt.Sprintf("OFFSET %d", q.Offset))),
-		},
-	}.ToSQL()
+	return Join(" ",
+		If(q.With != nil, Compile("WITH ?", q.With)),
+		SQL("SELECT"),
+		IfElse(q.Select != nil, q.Select, SQL("*")),
+		If(q.From != nil, Compile("FROM ?", q.From)),
+		If(q.Where != nil, Compile("WHERE ?", q.Where)),
+		If(q.GroupBy != nil, Compile("GROUP BY ?", q.GroupBy)),
+		If(q.Having != nil, Compile("HAVING ?", q.Having)),
+		If(q.Having != nil, Compile("WINDOW ?", q.Window)),
+		If(q.OrderBy != nil, Compile("ORDER BY ?", q.OrderBy)),
+		If(q.Limit > 0, SQL(fmt.Sprintf("LIMIT %d", q.Limit))),
+		If(q.Offset > 0, SQL(fmt.Sprintf("OFFSET %d", q.Offset))),
+	).ToSQL()
 }
 
 type Insert struct {
@@ -201,14 +209,11 @@ type Insert struct {
 }
 
 func (i Insert) ToSQL() (string, []any, error) {
-	return Join{
-		Sep: " ",
-		Expressions: []Expression{
-			SQL(fmt.Sprintf("INSERT INTO %s", i.Into)),
-			If(len(i.Columns) > 0, SQL(fmt.Sprintf("(%s)", strings.Join(i.Columns, ", ")))),
-			SQL("VALUES ?", i.Data),
-		},
-	}.ToSQL()
+	return Join(" ",
+		SQL(fmt.Sprintf("INSERT INTO %s", i.Into)),
+		If(len(i.Columns) > 0, SQL(fmt.Sprintf("(%s)", strings.Join(i.Columns, ", ")))),
+		Compile("VALUES ?", i.Data),
+	).ToSQL()
 }
 
 type Update struct {
@@ -218,13 +223,10 @@ type Update struct {
 }
 
 func (u Update) ToSQL() (string, []any, error) {
-	return Join{
-		Sep: " ",
-		Expressions: []Expression{
-			SQL(fmt.Sprintf("UPDATE %s SET ?", u.Table), u.Sets),
-			If(u.Where != nil, SQL("WHERE ?", u.Where)),
-		},
-	}.ToSQL()
+	return Join(" ",
+		Compile(fmt.Sprintf("UPDATE %s SET ?", u.Table), u.Sets),
+		If(u.Where != nil, Compile("WHERE ?", u.Where)),
+	).ToSQL()
 }
 
 type Delete struct {
@@ -233,27 +235,23 @@ type Delete struct {
 }
 
 func (d Delete) ToSQL() (string, []any, error) {
-	return Join{
-		Sep: " ",
-		Expressions: []Expression{
-			SQL(fmt.Sprintf("DELETE FROM %s", d.From)),
-			If(d.Where != nil, SQL("WHERE ?", d.Where)),
-		},
-	}.ToSQL()
+	return Join(" ",
+		SQL(fmt.Sprintf("DELETE FROM %s", d.From)),
+		If(d.Where != nil, Compile("WHERE ?", d.Where)),
+	).ToSQL()
+}
+
+func SQL(sql string, args ...any) Raw {
+	return Raw{SQL: sql, Args: args}
 }
 
 type Raw struct {
 	SQL  string
 	Args []any
-	Err  error
 }
 
-func (e Raw) ToSQL() (string, []any, error) {
-	if e.Err != nil {
-		return "", nil, e.Err
-	}
-
-	return e.SQL, e.Args, e.Err
+func (r Raw) ToSQL() (string, []any, error) {
+	return r.SQL, r.Args, nil
 }
 
 func ToPositional(placeholder string, expr Expression) (string, []any, error) {
@@ -302,10 +300,7 @@ func compile(expression any) (string, []any, error) {
 	case Expression:
 		return expr.ToSQL()
 	case []Expression:
-		return Join{
-			Sep:         ", ",
-			Expressions: expr,
-		}.ToSQL()
+		return Join(", ", expr...).ToSQL()
 	}
 
 	value := reflect.ValueOf(expression)

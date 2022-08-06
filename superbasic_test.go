@@ -12,8 +12,8 @@ import (
 func TestInsert(t *testing.T) {
 	t.Parallel()
 
-	insert := superbasic.SQL("INSERT INTO presidents (?) VALUES ? RETURNING id",
-		superbasic.SQL("nr, first, last"),
+	insert := superbasic.Compile("INSERT INTO presidents (?) VALUES ? RETURNING id",
+		superbasic.Compile("nr, first, last"),
 		[]superbasic.Values{
 			{46, "Joe", "Biden"},
 			{45, "Donald", "trump"},
@@ -39,12 +39,12 @@ func TestInsert(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	t.Parallel()
 
-	update := superbasic.SQL("UPDATE presidents SET ? WHERE ?",
+	update := superbasic.Compile("UPDATE presidents SET ? WHERE ?",
 		[]superbasic.Expression{
-			superbasic.SQL("first = ?", "Donald"),
-			superbasic.SQL("last = ?", "Trump"),
+			superbasic.Compile("first = ?", "Donald"),
+			superbasic.Compile("last = ?", "Trump"),
 		},
-		superbasic.SQL("nr = ?", 45),
+		superbasic.Compile("nr = ?", 45),
 	)
 
 	sql, args, err := update.ToSQL()
@@ -62,20 +62,20 @@ func TestQuery(t *testing.T) {
 
 	var search superbasic.Expression
 
-	search = superbasic.Join{
+	search = superbasic.Joiner{
 		Sep: " AND ",
 		Expressions: []superbasic.Expression{
-			superbasic.SQL("last IN ?", superbasic.Values{"Bush", "Clinton"}),
-			superbasic.SQL("NOT (nr > ?)", 42),
+			superbasic.Compile("last IN ?", superbasic.Values{"Bush", "Clinton"}),
+			superbasic.Compile("NOT (nr > ?)", 42),
 		},
 	}
 	sort := "first"
 
-	query := superbasic.Append{
-		superbasic.SQL("SELECT nr, first, last FROM presidents"),
-		superbasic.If(search != nil, superbasic.SQL(" WHERE ?", search)),
-		superbasic.If(sort != "", superbasic.SQL(fmt.Sprintf(" ORDER BY %s", sort))),
-	}
+	query := superbasic.Append(
+		superbasic.Compile("SELECT nr, first, last FROM presidents"),
+		superbasic.If(search != nil, superbasic.Compile(" WHERE ?", search)),
+		superbasic.If(sort != "", superbasic.Compile(fmt.Sprintf(" ORDER BY %s", sort))),
+	)
 
 	sql, args, err := query.ToSQL()
 	if err != nil {
@@ -91,12 +91,12 @@ func TestQuery(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Parallel()
 
-	del := superbasic.SQL("DELETE FROM presidents WHERE ?",
-		superbasic.Join{
+	del := superbasic.Compile("DELETE FROM presidents WHERE ?",
+		superbasic.Joiner{
 			Sep: " AND ",
 			Expressions: []superbasic.Expression{
-				superbasic.SQL("last = ?", "Bush"),
-				superbasic.SQL("first = ?", "Joe"),
+				superbasic.Compile("last = ?", "Bush"),
+				superbasic.Compile("first = ?", "Joe"),
 			},
 		},
 	)
@@ -114,7 +114,7 @@ func TestDelete(t *testing.T) {
 func TestEscape(t *testing.T) {
 	t.Parallel()
 
-	expr := superbasic.SQL("?? hello ? ??", "world")
+	expr := superbasic.Compile("?? hello ? ??", "world")
 
 	sql, args, err := superbasic.ToPositional("$", expr)
 	if err != nil {
@@ -129,11 +129,11 @@ func TestEscape(t *testing.T) {
 func TestExpressionSlice(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.SQL("?", []superbasic.Expression{
-		superbasic.SQL("hello"),
-		superbasic.SQL("world"),
-		superbasic.IfElse(true, superbasic.SQL("welcome"), superbasic.SQL("moin")),
-		superbasic.IfElse(false, superbasic.SQL("welcome"), superbasic.SQL("moin")),
+	sql, args, err := superbasic.Compile("?", []superbasic.Expression{
+		superbasic.Compile("hello"),
+		superbasic.Compile("world"),
+		superbasic.IfElse(true, superbasic.Compile("welcome"), superbasic.Compile("moin")),
+		superbasic.IfElse(false, superbasic.Compile("welcome"), superbasic.Compile("moin")),
 	}).ToSQL()
 	if err != nil {
 		t.Error(err)
@@ -147,13 +147,10 @@ func TestExpressionSlice(t *testing.T) {
 func TestJoin(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.Join{
-		Sep: ", ",
-		Expressions: []superbasic.Expression{
-			superbasic.SQL(""),
-			superbasic.SQL("? ?", "hello"),
-		},
-	}.ToSQL()
+	sql, args, err := superbasic.Join(", ",
+		superbasic.Compile(""),
+		superbasic.Compile("? ?", "hello"),
+	).ToSQL()
 	if err.Error() != "invalid number of arguments: got '1' want '1'" {
 		t.Fatal("NumberOfArgumentsError", sql, args, err)
 	}
@@ -175,28 +172,28 @@ func TestIf(t *testing.T) {
 func TestSQL(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.SQL("?", nil).ToSQL()
+	sql, args, err := superbasic.Compile("?", nil).ToSQL()
 	if err.Error() != "invalid expression" {
 		t.Fatal("ExpressionError", sql, args, err)
 	}
 
-	sql, args, err = superbasic.SQL("?", []superbasic.Expression{
-		superbasic.SQL("hello"), superbasic.SQL("world"),
+	sql, args, err = superbasic.Compile("?", []superbasic.Expression{
+		superbasic.Compile("hello"), superbasic.Compile("world"),
 	}).ToSQL()
 
 	if sql != "hello, world" {
 		t.Fatal(sql, args, err)
 	}
 
-	sql, args, err = superbasic.SQL("?", []superbasic.Expression{
-		superbasic.SQL("hello"), superbasic.SQL(""), superbasic.SQL("?"),
+	sql, args, err = superbasic.Compile("?", []superbasic.Expression{
+		superbasic.Compile("hello"), superbasic.Compile(""), superbasic.Compile("?"),
 	}).ToSQL()
 	if (!errors.Is(err, superbasic.NumberOfArgumentsError{})) {
 		t.Fatal("NumberOfArgumentsError 2", sql, args, err)
 	}
 
-	sql, args, err = superbasic.SQL("?", []superbasic.Expression{
-		superbasic.SQL("", []any{"hello"}),
+	sql, args, err = superbasic.Compile("?", []superbasic.Expression{
+		superbasic.Compile("", []any{"hello"}),
 	}).ToSQL()
 	if sql != "" {
 		t.Fatal(sql, args, err)
@@ -206,7 +203,7 @@ func TestSQL(t *testing.T) {
 func TestOr(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.SQL("(? OR ?)", superbasic.SQL("hello"), superbasic.SQL("moin")).ToSQL()
+	sql, args, err := superbasic.Compile("(? OR ?)", superbasic.Compile("hello"), superbasic.Compile("moin")).ToSQL()
 	if err != nil {
 		t.Error(err)
 	}
@@ -219,7 +216,7 @@ func TestOr(t *testing.T) {
 func TestNotEquals(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.SQL("hello != ?", superbasic.SQL("moin")).ToSQL()
+	sql, args, err := superbasic.Compile("hello != ?", superbasic.Compile("moin")).ToSQL()
 	if err != nil {
 		t.Error(err)
 	}
@@ -237,12 +234,12 @@ func TestPositional(t *testing.T) {
 		t.Fatal(sql, args, err)
 	}
 
-	sql, args, err = superbasic.ToPositional("$", superbasic.SQL("?"))
+	sql, args, err = superbasic.ToPositional("$", superbasic.Compile("?"))
 	if !errors.Is(err, superbasic.NumberOfArgumentsError{}) {
 		t.Fatal(sql, args, err)
 	}
 
-	sql, args, err = superbasic.ToPositional("$", superbasic.SQL("?"))
+	sql, args, err = superbasic.ToPositional("$", superbasic.Compile("?"))
 	if !errors.Is(err, superbasic.NumberOfArgumentsError{}) {
 		t.Fatal(sql, args, err)
 	}
@@ -252,14 +249,14 @@ func TestQuery2(t *testing.T) {
 	t.Parallel()
 
 	sql, args, err := superbasic.Query{
-		With:    superbasic.SQL("with"),
-		Select:  superbasic.SQL("column"),
-		From:    superbasic.SQL("from"),
-		Where:   superbasic.SQL("where"),
-		GroupBy: superbasic.SQL("group"),
-		Having:  superbasic.SQL("having"),
-		Window:  superbasic.SQL("window"),
-		OrderBy: superbasic.SQL("order"),
+		With:    superbasic.Compile("with"),
+		Select:  superbasic.Compile("column"),
+		From:    superbasic.Compile("from"),
+		Where:   superbasic.Compile("where"),
+		GroupBy: superbasic.Compile("group"),
+		Having:  superbasic.Compile("having"),
+		Window:  superbasic.Compile("window"),
+		OrderBy: superbasic.Compile("order"),
 		Limit:   1,
 		Offset:  1,
 	}.ToSQL()
@@ -304,10 +301,10 @@ func TestUpdate2(t *testing.T) {
 	sql, args, err := superbasic.Update{
 		Table: "presidents",
 		Sets: []superbasic.Expression{
-			superbasic.SQL("first = ?", "Donald"),
-			superbasic.SQL("last = ?", "Trump"),
+			superbasic.Compile("first = ?", "Donald"),
+			superbasic.Compile("last = ?", "Trump"),
 		},
-		Where: superbasic.SQL("nr = ?", 45),
+		Where: superbasic.Compile("nr = ?", 45),
 	}.ToSQL()
 
 	if err != nil {
@@ -324,7 +321,7 @@ func TestDelete2(t *testing.T) {
 
 	sql, args, err := superbasic.Delete{
 		From:  "presidents",
-		Where: superbasic.SQL("last = ?", "Bush"),
+		Where: superbasic.Compile("last = ?", "Bush"),
 	}.ToSQL()
 
 	if err != nil {

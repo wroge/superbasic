@@ -20,4 +20,4 @@ https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e597622
 
 Additionally, there are Query, Insert, Update and Delete helpers that can be used to create prepared statements.
 
-https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L64-L80
+https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L40-L56

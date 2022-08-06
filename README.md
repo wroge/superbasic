@@ -8,6 +8,8 @@
 
 ```superbasic.SQL``` compiles expressions into SQL strings and thus offers an alternative to conventional query builders.
 
+https://github.com/wroge/superbasic/blob/be7223bbef84a6db8515b838cda9a7cbc29d6a10/superbasic.go#L40-L42
+
 ### Compile Expressions into SQL
 
 You can compile a list of values into an SQL string...

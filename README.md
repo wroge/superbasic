@@ -5,19 +5,18 @@
 ![golangci-lint](https://github.com/wroge/superbasic/workflows/golangci-lint/badge.svg)
 [![codecov](https://codecov.io/gh/wroge/superbasic/branch/main/graph/badge.svg?token=SBSedMOGHR)](https://codecov.io/gh/wroge/superbasic)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/superbasic.svg?style=social)](https://github.com/wroge/superbasic/tags)
-
 ```superbasic.SQL``` compiles expressions into SQL strings and thus offers an alternative to conventional query builders.
 
-https://github.com/wroge/superbasic/blob/be7223bbef84a6db8515b838cda9a7cbc29d6a10/superbasic.go#L40-L42
+https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/superbasic.go#L40-L42
 
 You can compile a list of values into an SQL string...
 
-https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L11-L26
+https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/example/main.go#L11-L26
 
 or any other expression. Lists of expressions are always joined by a comma.
 
-https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L28-L38
+https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/example/main.go#L28-L38
 
 Additionally, there are Query, Insert, Update and Delete helpers that can be used to create prepared statements.
 
-https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L40-L56
+https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/example/main.go#L40-L51

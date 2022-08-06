@@ -1,4 +1,4 @@
-//nolint:forbidigo,gomnd,staticcheck,exhaustivestruct,funlen,exhaustruct,wsl
+//nolint:gomnd,exhaustivestruct,forbidigo,funlen,wsl,exhaustruct
 package main
 
 import (
@@ -27,10 +27,10 @@ func main() {
 	// [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush]
 
 	expr = superbasic.SQL("UPDATE presidents SET ? WHERE ?",
-		superbasic.Join(", ",
+		[]superbasic.Expression{
 			superbasic.SQL("first = ?", "Donald"),
 			superbasic.SQL("last = ?", "Trump"),
-		),
+		},
 		superbasic.SQL("nr = ?", 45),
 	)
 
@@ -40,21 +40,18 @@ func main() {
 
 	columns := []string{"nr", "first", "last"}
 
-	var where superbasic.Expression = superbasic.SQL("(? OR ?)",
+	where := superbasic.SQL("(? OR ?)",
 		superbasic.SQL("last = ?", "Bush"),
 		superbasic.SQL("nr >= ?", 45),
 	)
 
-	expr = superbasic.Join(" ",
-		superbasic.SQL("SELECT"),
-		superbasic.IfElse(len(columns) > 0, superbasic.SQL(strings.Join(columns, ", ")), superbasic.SQL("*")),
-		superbasic.SQL("FROM presidents"),
-		superbasic.If(where != nil, superbasic.SQL("WHERE ?", where)),
-		superbasic.SQL(fmt.Sprintf("ORDER BY %s", "nr")),
-		superbasic.SQL(fmt.Sprintf("LIMIT %d", 3)),
-	)
+	builder := superbasic.Build().SQL("SELECT ").
+		IfElse(len(columns) > 0, superbasic.SQL(strings.Join(columns, ", ")), superbasic.SQL("*")).
+		SQL(" FROM presidents").
+		If(where.SQL != "", superbasic.SQL(" WHERE ?", where)).
+		SQL(fmt.Sprintf(" ORDER BY %s", "nr")).SQL(fmt.Sprintf(" LIMIT %d", 3))
 
-	fmt.Println(expr.ToSQL())
+	fmt.Println(builder.ToSQL())
 	// SELECT nr, first, last FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3
 	// [Bush 44]
 
@@ -82,7 +79,7 @@ func main() {
 		},
 	}
 
-	fmt.Println(superbasic.Join(" ", insert, superbasic.SQL("RETURNING id")).ToSQL())
+	fmt.Println(superbasic.SQL("? RETURNING id", insert).ToSQL())
 	// INSERT INTO presidents (nr, first, last) VALUES
 	// 		(?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?) RETURNING id
 	// [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush]

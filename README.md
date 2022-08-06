@@ -22,11 +22,11 @@ https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e597622
 
 ### Queries
 
-With this library it is particularly easy to create dynamic queries based on conditions. In this example, the WHERE-clause is only included if a corresponding expression exists.
+It is particularly easy to create dynamic queries based on conditions. Here, the WHERE-clause is only included if a corresponding expression exists.
 
 https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L40-L52
 
-Of course you can do the same with this Query.
+Of course you can do the same with this minimalistic Query builder.
 
 https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L54-L62
 

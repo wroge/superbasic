@@ -8,20 +8,103 @@
 
 ```superbasic.SQL``` compiles expressions into SQL strings and thus offers an alternative to conventional query builders.
 
-https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/superbasic.go#L40-L42
+```go
+type Expression interface { 
+    ToSQL() (string, []any, error) 
+}
+```
+
+## Compile Expressions into SQL
 
 You can compile a list of values into an SQL string...
 
-https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/example/main.go#L11-L26
+```go
+expr := superbasic.SQL("INSERT INTO presidents (nr, first, last) VALUES ? RETURNING id", 
+    []superbasic.Values{ 
+        {46, "Joe", "Biden"}, 
+        {45, "Donald", "trump"}, 
+        {44, "Barack", "Obama"}, 
+        {43, "George W.", "Bush"}, 
+        {42, "Bill", "Clinton"}, 
+        {41, "George H. W.", "Bush"}, 
+    }, 
+) 
+
+fmt.Println(superbasic.ToPositional("$", expr)) 
+// INSERT INTO presidents (nr, first, last) VALUES 
+// 		($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12), ($13, $14, $15), ($16, $17, $18) 
+//		RETURNING id 
+// [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush] 
+```
 
 or any other expression. Lists of expressions are always joined by a comma.
 
-https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/example/main.go#L28-L38
+```go
+expr = superbasic.SQL("UPDATE presidents SET ? WHERE ?", 
+ 	[]superbasic.Expression{ 
+ 		superbasic.SQL("first = ?", "Donald"), 
+ 		superbasic.SQL("last = ?", "Trump"), 
+ 	}, 
+ 	superbasic.SQL("nr = ?", 45), 
+) 
+  
+fmt.Println(expr.ToSQL()) 
+// UPDATE presidents SET first = ?, last = ? WHERE nr = ? 
+// [Donald Trump 45] 
+```
+
+## Query
 
 Additionally, there are Query, Insert, Update and Delete helpers that can be used to create prepared statements.
 
-https://github.com/wroge/superbasic/blob/828653a4af80c2af574af64bebe761ac650672fd/example/main.go#L40-L51
+```go
+query := superbasic.Query{ 
+ 	From: superbasic.SQL("presidents"), 
+ 	Where: superbasic.SQL("(? OR ?)", 
+ 		superbasic.SQL("last = ?", "Bush"), 
+ 		superbasic.SQL("nr >= ?", 45), 
+ 	), 
+ 	OrderBy: superbasic.SQL("nr"), 
+ 	Limit:   3, 
+} 
+
+fmt.Println(query.ToSQL()) 
+// SELECT * FROM presidents WHERE (last = ? OR nr >= ?) ORDER BY nr LIMIT 3 
+// [Bush 44] 
+```
 
 The Query helper can be used as a reference to build your own expressions...
 
-https://github.com/wroge/superbasic/blob/91bc5df478e8ba0de9910628cac8ae8d54241fe4/superbasic.go#L165-L195
+```go
+type Query struct { 
+ 	With    Expression 
+ 	Select  Expression 
+ 	From    Expression 
+ 	Where   Expression 
+ 	GroupBy Expression 
+ 	Having  Expression 
+ 	Window  Expression 
+ 	OrderBy Expression 
+ 	Limit   uint64 
+ 	Offset  uint64 
+} 
+  
+func (q Query) ToSQL() (string, []any, error) { 
+    return Join{ 
+        Sep: " ", 
+        Expressions: []Expression{ 
+            If(q.With != nil, SQL("WITH ?", q.With)), 
+            SQL("SELECT"), 
+            IfElse(q.Select != nil, q.Select, SQL("*")), 
+            If(q.From != nil, SQL("FROM ?", q.From)), 
+            If(q.Where != nil, SQL("WHERE ?", q.Where)), 
+            If(q.GroupBy != nil, SQL("GROUP BY ?", q.GroupBy)), 
+            If(q.Having != nil, SQL("HAVING ?", q.Having)), 
+            If(q.Having != nil, SQL("WINDOW ?", q.Window)), 
+            If(q.OrderBy != nil, SQL("ORDER BY ?", q.OrderBy)), 
+            If(q.Limit > 0, SQL(fmt.Sprintf("LIMIT %d", q.Limit))), 
+            If(q.Offset > 0, SQL(fmt.Sprintf("OFFSET %d", q.Offset))), 
+        }, 
+    }.ToSQL() 
+} 
+```

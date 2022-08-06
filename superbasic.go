@@ -1,68 +1,56 @@
-//nolint:exhaustivestruct,exhaustruct,wrapcheck,ireturn
+//nolint:exhaustivestruct,exhaustruct,wrapcheck,ireturn,exhaustive
 package superbasic
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 )
 
 // NumberOfArgumentsError is returned if arguments doesn't match the number of placeholders.
-type NumberOfArgumentsError struct{}
+type NumberOfArgumentsError struct {
+	Got, Want int
+}
 
 func (e NumberOfArgumentsError) Error() string {
+	if e.Got > 0 || e.Want > 0 {
+		return fmt.Sprintf("invalid number of arguments: got '%d' want '%d'", e.Got, e.Want)
+	}
+
 	return "invalid number of arguments"
 }
 
-func (e NumberOfArgumentsError) ToSQL() (string, []any, error) {
-	return "", nil, e
+// ExpressionError is returned if expressions are nil.
+type ExpressionError struct {
+	Err error
 }
 
-// ExpressionError is returned if expressions are nil.
-type ExpressionError struct{}
-
 func (e ExpressionError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("invalid expression: %s", e.Err.Error())
+	}
+
 	return "invalid expression"
 }
 
-func (e ExpressionError) ToSQL() (string, []any, error) {
-	return "", nil, e
+func (e ExpressionError) Unwrap() error {
+	return e.Err
 }
 
 type Expression interface {
 	ToSQL() (string, []any, error)
 }
 
-func compile(sep string, expression any) (string, []any, error) {
-	switch expr := expression.(type) {
-	case Expression:
-		return expr.ToSQL()
-	case []Expression:
-		return Join(sep, expr...).ToSQL()
-	case [][]any:
-		arr := make([]Expression, len(expr))
+type Values []any
 
-		for i, d := range expr {
-			arr[i] = Values(d...)
-		}
-
-		return Join(", ", arr...).ToSQL()
-	case []any:
-		return Values(expr...).ToSQL()
-	default:
-		return "?", []any{expr}, nil
-	}
-}
-
-func Values(values ...any) Expression {
-	return expression{sql: fmt.Sprintf("(%s)", strings.Repeat(", ?", len(values))[2:]), args: values}
+func (v Values) ToSQL() (string, []any, error) {
+	return fmt.Sprintf("(%s)", strings.Repeat(", ?", len(v))[2:]), v, nil
 }
 
 // SQL takes a template with placeholders into which expressions can be compiled.
 // []Expression is compiled to Join(", ", expr...).
-// Expression []any is compiled to (?, ?).
-// Expression [][]any is compiled to (?, ?), (?, ?).
 // Escape '?' by using '??'.
-func SQL(sql string, expressions ...any) Expression {
+func SQL(sql string, expressions ...any) Expr {
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(expressions))
 
@@ -86,19 +74,19 @@ func SQL(sql string, expressions ...any) Expression {
 		exprIndex++
 
 		if exprIndex >= len(expressions) {
-			return NumberOfArgumentsError{}
+			return Expr{Err: NumberOfArgumentsError{Got: exprIndex, Want: len(expressions)}}
 		}
 
 		if expressions[exprIndex] == nil {
-			return ExpressionError{}
+			return Expr{Err: ExpressionError{}}
 		}
 
 		builder.WriteString(sql[:index])
 		sql = sql[index+1:]
 
-		sql, args, err := compile(", ", expressions[exprIndex])
+		sql, args, err := compile(expressions[exprIndex])
 		if err != nil {
-			return expression{err: err}
+			return Expr{Err: err}
 		}
 
 		builder.WriteString(sql)
@@ -106,18 +94,18 @@ func SQL(sql string, expressions ...any) Expression {
 		arguments = append(arguments, args...)
 	}
 
-	if exprIndex != len(expressions)-1 {
-		return NumberOfArgumentsError{}
+	if exprIndex >= len(expressions) {
+		return Expr{Err: NumberOfArgumentsError{Got: exprIndex, Want: len(expressions)}}
 	}
 
-	return expression{sql: builder.String(), args: arguments}
+	return Expr{SQL: builder.String(), Args: arguments}
 }
 
-func Append(expressions ...Expression) Expression {
+func Append(expressions ...Expression) Expr {
 	return Join("", expressions...)
 }
 
-func Join(sep string, expressions ...Expression) Expression {
+func Join(sep string, expressions ...Expression) Expr {
 	builder := &strings.Builder{}
 	arguments := make([]any, 0, len(expressions))
 
@@ -125,12 +113,12 @@ func Join(sep string, expressions ...Expression) Expression {
 
 	for _, expr := range expressions {
 		if expr == nil {
-			return ExpressionError{}
+			return Expr{Err: ExpressionError{}}
 		}
 
 		sql, args, err := expr.ToSQL()
 		if err != nil {
-			return expression{err: err}
+			return Expr{Err: err}
 		}
 
 		if sql == "" {
@@ -148,155 +136,23 @@ func Join(sep string, expressions ...Expression) Expression {
 		arguments = append(arguments, args...)
 	}
 
-	return expression{sql: builder.String(), args: arguments}
+	return Expr{SQL: builder.String(), Args: arguments}
 }
 
-func If(condition bool, then any) Expression {
+func If(condition bool, then Expression) Expression {
 	if condition {
-		return SQL("?", then)
+		return then
 	}
 
-	return expression{}
+	return Expr{}
 }
 
-func IfElse(condition bool, then, els any) Expression {
+func IfElse(condition bool, then, els Expression) Expression {
 	if condition {
-		return SQL("?", then)
+		return then
 	}
 
-	return SQL("?", els)
-}
-
-func And(expr ...Expression) Expression {
-	return Join(" AND ", expr...)
-}
-
-func Or(left, right Expression) Expression {
-	return SQL("(? OR ?)", left, right)
-}
-
-func Not(expr Expression) Expression {
-	return SQL("NOT (?)", expr)
-}
-
-func Equals(left, right any) Expression {
-	return SQL("? = ?", left, right)
-}
-
-func EqualsIdent(ident string, value any) Expression {
-	return Equals(SQL(ident), value)
-}
-
-func NotEquals(left, right any) Expression {
-	return SQL("? <> ?", left, right)
-}
-
-func NotEqualsIdent(ident string, value any) Expression {
-	return NotEquals(SQL(ident), value)
-}
-
-func Greater(left, right any) Expression {
-	return SQL("? > ?", left, right)
-}
-
-func GreaterIdent(ident string, value any) Expression {
-	return Greater(SQL(ident), value)
-}
-
-func GreaterOrEquals(left, right any) Expression {
-	return SQL("? >= ?", left, right)
-}
-
-func GreaterOrEqualsIdent(ident string, value any) Expression {
-	return GreaterOrEquals(SQL(ident), value)
-}
-
-func Less(left, right any) Expression {
-	return SQL("? < ?", left, right)
-}
-
-func LessIdent(ident string, value any) Expression {
-	return Less(SQL(ident), value)
-}
-
-func LessOrEquals(left, right any) Expression {
-	return SQL("? <= ?", left, right)
-}
-
-func LessOrEqualsIdent(ident string, value any) Expression {
-	return LessOrEquals(SQL(ident), value)
-}
-
-func In(left, right any) Expression {
-	return SQL("? IN ?", left, right)
-}
-
-func InIdent(ident string, value any) Expression {
-	return In(SQL(ident), value)
-}
-
-func NotIn(left, right any) Expression {
-	return SQL("? NOT IN ?", left, right)
-}
-
-func NotInIdent(ident string, value any) Expression {
-	return NotIn(SQL(ident), value)
-}
-
-func IsNull(expr any) Expression {
-	return SQL("? IS NULL", expr)
-}
-
-func IsNullIdent(ident string) Expression {
-	return IsNull(SQL(ident))
-}
-
-func IsNotNull(expr any) Expression {
-	return SQL("? IS NOT NULL", expr)
-}
-
-func IsNotNullIdent(ident string) Expression {
-	return IsNotNull(SQL(ident))
-}
-
-func Between(expr, lower, higher any) Expression {
-	return SQL("? BETWEEN ? AND ?", expr, lower, higher)
-}
-
-func BetweenIdent(ident string, lower, higher any) Expression {
-	return Between(SQL(ident), lower, higher)
-}
-
-func NotBetween(expr, lower, higher any) Expression {
-	return SQL("? NOT BETWEEN ? AND ?", expr, lower, higher)
-}
-
-func NotBetweenIdent(ident string, lower, higher any) Expression {
-	return NotBetween(SQL(ident), lower, higher)
-}
-
-func Like(left, right any) Expression {
-	return SQL("? LIKE ?", left, right)
-}
-
-func LikeIdent(ident string, value any) Expression {
-	return Like(SQL(ident), value)
-}
-
-func NotLike(left, right any) Expression {
-	return SQL("? NOT LIKE ?", left, right)
-}
-
-func NotLikeIdent(ident string, value any) Expression {
-	return NotLike(SQL(ident), value)
-}
-
-func Cast(expr any, as string) Expression {
-	return SQL(fmt.Sprintf("CAST(? AS %s)", as), expr)
-}
-
-func CastIdent(ident string, as string) Expression {
-	return Cast(SQL(ident), as)
+	return els
 }
 
 type Query struct {
@@ -326,7 +182,7 @@ func (q Query) ToSQL() (string, []any, error) {
 type Insert struct {
 	Into    string
 	Columns []string
-	Data    [][]any
+	Data    []Values
 }
 
 func (i Insert) ToSQL() (string, []any, error) {
@@ -362,18 +218,18 @@ func (d Delete) ToSQL() (string, []any, error) {
 	).ToSQL()
 }
 
-type expression struct {
-	sql  string
-	args []any
-	err  error
+type Expr struct {
+	SQL  string
+	Args []any
+	Err  error
 }
 
-func (e expression) ToSQL() (string, []any, error) {
-	if e.err != nil {
-		return "", nil, e.err
+func (e Expr) ToSQL() (string, []any, error) {
+	if e.Err != nil {
+		return "", nil, e.Err
 	}
 
-	return e.sql, e.args, e.err
+	return e.SQL, e.Args, e.Err
 }
 
 func ToPositional(placeholder string, expr Expression) (string, []any, error) {
@@ -411,8 +267,44 @@ func ToPositional(placeholder string, expr Expression) (string, []any, error) {
 	}
 
 	if argIndex != len(args)-1 {
-		return "", nil, NumberOfArgumentsError{}
+		return "", nil, NumberOfArgumentsError{Got: argIndex, Want: len(args)}
 	}
 
 	return build.String(), args, nil
+}
+
+func compile(expression any) (string, []any, error) {
+	switch expr := expression.(type) {
+	case Expression:
+		return expr.ToSQL()
+	case []Expression:
+		return Join(", ", expr...).ToSQL()
+	}
+
+	value := reflect.ValueOf(expression)
+
+	switch value.Kind() {
+	case reflect.Slice, reflect.Array:
+		builder := &strings.Builder{}
+		arguments := make([]any, 0, value.Len())
+
+		for index := 0; index < value.Len(); index++ {
+			sql, args, err := compile(value.Index(index).Interface())
+			if err != nil {
+				return "", nil, err
+			}
+
+			if index != 0 {
+				builder.WriteString(", ")
+			}
+
+			builder.WriteString(sql)
+
+			arguments = append(arguments, args...)
+		}
+
+		return builder.String(), arguments, nil
+	default:
+		return "?", []any{expression}, nil
+	}
 }

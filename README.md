@@ -6,7 +6,7 @@
 [![codecov](https://codecov.io/gh/wroge/superbasic/branch/main/graph/badge.svg?token=SBSedMOGHR)](https://codecov.io/gh/wroge/superbasic)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/wroge/superbasic.svg?style=social)](https://github.com/wroge/superbasic/tags)
 
-This package compiles expressions and value-lists into SQL strings and thus offers an alternative to conventional query builders.
+This package compiles expressions into SQL strings and thus offers an alternative to conventional query builders.
 
 ### Compile Values into SQL
 
@@ -16,7 +16,7 @@ https://github.com/wroge/superbasic/blob/7ce2194db7957b960b3d41233591c41d90b8728
 
 ### Compile Expressions into SQL
 
-Similarly, expressions can be compiled in place of placeholders, which offers many new possibilities to create prepared statements. Some helper functions can be used, but my favorite is to write raw sql at any time.
+Similarly, expressions can be compiled in place of placeholders, which offers many new possibilities to create prepared statements.
 
 https://github.com/wroge/superbasic/blob/7ce2194db7957b960b3d41233591c41d90b8728d/example/main.go#L28-L38
 

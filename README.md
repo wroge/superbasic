@@ -8,14 +8,13 @@
 
 This package compiles expressions into SQL strings and thus offers an alternative to conventional query builders.
 
-### Compile Values into SQL
-
-In this example, a list of values is compiled into an SQL string.
-https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L11-L26
-
 ### Compile Expressions into SQL
 
-Similarly, expressions can be compiled in place of placeholders, which offers many new possibilities to create prepared statements.
+In this example, a list of values is compiled into an SQL string.
+
+https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L11-L26
+
+Arrays or slices of expressions are joined by a comma.
 
 https://github.com/wroge/superbasic/blob/5daab8f309f59becbe89872659894345e5976221/example/main.go#L28-L38
 

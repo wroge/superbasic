@@ -24,15 +24,14 @@ https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfa
 
 With this library it is particularly easy to create dynamic queries based on conditions. In this example, the WHERE-clause is only included if a corresponding expression exists.
 
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L41-L59
+https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L41-L56
 
 Of course you can do the same with this Query.
 
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L61-L70
+https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L58-L67
 
 ### Insert, Update, Delete
 
 Additionally, there are Insert, Update and Delete helpers that can be used to create prepared statements.
 
-
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L72-L88
+https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L69-L85

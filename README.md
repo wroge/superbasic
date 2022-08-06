@@ -12,7 +12,7 @@ This package compiles expressions into SQL strings and thus offers an alternativ
 
 In this example, a list of values is compiled into an SQL string.
 
-https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L12-27
+https://github.com/wroge/superbasic/blob/94b8f01875c84aadd95ab1e9c55f13106779cfac/example/main.go#L12-L27
 
 ### Compile Expressions into SQL
 

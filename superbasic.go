@@ -3,7 +3,6 @@ package superbasic
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 )
 
@@ -13,11 +12,7 @@ type NumberOfArgumentsError struct {
 }
 
 func (e NumberOfArgumentsError) Error() string {
-	if e.Got > 0 || e.Want > 0 {
-		return fmt.Sprintf("invalid number of arguments: got '%d' want '%d'", e.Got, e.Want)
-	}
-
-	return "invalid number of arguments"
+	return fmt.Sprintf("invalid number of arguments: got '%d' want '%d'", e.Got, e.Want)
 }
 
 // ExpressionError is returned if expressions are nil.
@@ -48,15 +43,14 @@ func (v Values) ToSQL() (string, []any, error) {
 }
 
 // Compile takes a template with placeholders into which expressions can be compiled.
-// []Expression is compiled to Join(", ", expr...).
 // Escape '?' by using '??'.
-func Compile(template string, expressions ...any) Compiler {
+func Compile(template string, expressions ...Expression) Compiler {
 	return Compiler{Template: template, Expressions: expressions}
 }
 
 type Compiler struct {
 	Template    string
-	Expressions []any
+	Expressions []Expression
 }
 
 func (c Compiler) ToSQL() (string, []any, error) {
@@ -87,15 +81,17 @@ func (c Compiler) ToSQL() (string, []any, error) {
 		}
 
 		if c.Expressions[exprIndex] == nil {
-			return "", nil, ExpressionError{}
+			return "", nil, ExpressionError{
+				Err: fmt.Errorf("expression at index '%d' is nil", exprIndex),
+			}
 		}
 
 		builder.WriteString(c.Template[:index])
 		c.Template = c.Template[index+1:]
 
-		sql, args, err := compile(c.Expressions[exprIndex], nil)
+		sql, args, err := c.Expressions[exprIndex].ToSQL()
 		if err != nil {
-			return "", nil, err
+			return "", nil, ExpressionError{Err: err}
 		}
 
 		builder.WriteString(sql)
@@ -129,14 +125,16 @@ func (j Joiner) ToSQL() (string, []any, error) {
 
 	isFirst := true
 
-	for _, expr := range j.Expressions {
+	for i, expr := range j.Expressions {
 		if expr == nil {
-			return "", nil, ExpressionError{}
+			return "", nil, ExpressionError{
+				Err: fmt.Errorf("expression at index '%d' is nil", i),
+			}
 		}
 
 		sql, args, err := expr.ToSQL()
 		if err != nil {
-			return "", nil, err
+			return "", nil, ExpressionError{Err: err}
 		}
 
 		if sql == "" {
@@ -189,8 +187,7 @@ type Query struct {
 func (q Query) ToSQL() (string, []any, error) {
 	return Join(" ",
 		If(q.With != nil, Compile("WITH ?", q.With)),
-		SQL("SELECT"),
-		IfElse(q.Select != nil, q.Select, SQL("*")),
+		IfElse(q.Select != nil, Compile("SELECT ?", q.Select), SQL("SELECT *")),
 		If(q.From != nil, Compile("FROM ?", q.From)),
 		If(q.Where != nil, Compile("WHERE ?", q.Where)),
 		If(q.GroupBy != nil, Compile("GROUP BY ?", q.GroupBy)),
@@ -212,7 +209,7 @@ func (i Insert) ToSQL() (string, []any, error) {
 	return Join(" ",
 		SQL(fmt.Sprintf("INSERT INTO %s", i.Into)),
 		If(len(i.Columns) > 0, SQL(fmt.Sprintf("(%s)", strings.Join(i.Columns, ", ")))),
-		Compile("VALUES ?", i.Data),
+		Compile("VALUES ?", Join(", ", Slice(i.Data)...)),
 	).ToSQL()
 }
 
@@ -224,7 +221,7 @@ type Update struct {
 
 func (u Update) ToSQL() (string, []any, error) {
 	return Join(" ",
-		Compile(fmt.Sprintf("UPDATE %s SET ?", u.Table), u.Sets),
+		Compile(fmt.Sprintf("UPDATE %s SET ?", u.Table), Join(", ", u.Sets...)),
 		If(u.Where != nil, Compile("WHERE ?", u.Where)),
 	).ToSQL()
 }
@@ -248,20 +245,23 @@ func SQL(sql string, args ...any) Raw {
 type Raw struct {
 	SQL  string
 	Args []any
+	Err  error
 }
 
 func (r Raw) ToSQL() (string, []any, error) {
-	return r.SQL, r.Args, nil
+	return r.SQL, r.Args, r.Err
 }
 
-func ToPositional(placeholder string, expr Expression) (string, []any, error) {
+func Finalize(placeholder string, expr Expression) (string, []any, error) {
 	if expr == nil {
-		return "", nil, ExpressionError{}
+		return "", nil, ExpressionError{
+			Err: fmt.Errorf("expression is nil"),
+		}
 	}
 
 	sql, args, err := expr.ToSQL()
 	if err != nil {
-		return "", nil, err
+		return "", nil, ExpressionError{Err: err}
 	}
 
 	build := &strings.Builder{}
@@ -295,7 +295,9 @@ func ToPositional(placeholder string, expr Expression) (string, []any, error) {
 	return build.String(), args, nil
 }
 
-func toExpressionSlice[T Expression](s []T) []Expression {
+// Slice creates a slice of expressions from any slice of expressions.
+// This function will exists util there are better alternatives.
+func Slice[T Expression](s []T) []Expression {
 	out := make([]Expression, len(s))
 
 	for i := range out {
@@ -303,43 +305,4 @@ func toExpressionSlice[T Expression](s []T) []Expression {
 	}
 
 	return out
-}
-
-func compile(start any, expression any) (string, []any, error) {
-	if expression == nil {
-		expression = start
-	}
-
-	switch expr := expression.(type) {
-	case Expression:
-		return expr.ToSQL()
-	case []Expression:
-		return Join(", ", expr...).ToSQL()
-	}
-
-	value := reflect.ValueOf(expression)
-
-	switch value.Kind() {
-	case reflect.Slice, reflect.Array:
-		builder := &strings.Builder{}
-		arguments := make([]any, 0, value.Len())
-
-		for index := 0; index < value.Len(); index++ {
-			sql, args, err := compile(start, value.Index(index).Interface())
-			if err != nil {
-				return "", nil, err
-			}
-
-			if index != 0 {
-				builder.WriteString(", ")
-			}
-
-			builder.WriteString(sql)
-			arguments = append(arguments, args...)
-		}
-
-		return builder.String(), arguments, nil
-	default:
-		return "?", []any{start}, nil
-	}
 }

@@ -93,7 +93,7 @@ func (c Compiler) ToSQL() (string, []any, error) {
 		builder.WriteString(c.Template[:index])
 		c.Template = c.Template[index+1:]
 
-		sql, args, err := compile(c.Expressions[exprIndex])
+		sql, args, err := compile(c.Expressions[exprIndex], nil)
 		if err != nil {
 			return "", nil, err
 		}
@@ -295,7 +295,21 @@ func ToPositional(placeholder string, expr Expression) (string, []any, error) {
 	return build.String(), args, nil
 }
 
-func compile(expression any) (string, []any, error) {
+func toExpressionSlice[T Expression](s []T) []Expression {
+	out := make([]Expression, len(s))
+
+	for i := range out {
+		out[i] = s[i]
+	}
+
+	return out
+}
+
+func compile(start any, expression any) (string, []any, error) {
+	if expression == nil {
+		expression = start
+	}
+
 	switch expr := expression.(type) {
 	case Expression:
 		return expr.ToSQL()
@@ -311,7 +325,7 @@ func compile(expression any) (string, []any, error) {
 		arguments := make([]any, 0, value.Len())
 
 		for index := 0; index < value.Len(); index++ {
-			sql, args, err := compile(value.Index(index).Interface())
+			sql, args, err := compile(start, value.Index(index).Interface())
 			if err != nil {
 				return "", nil, err
 			}
@@ -321,12 +335,11 @@ func compile(expression any) (string, []any, error) {
 			}
 
 			builder.WriteString(sql)
-
 			arguments = append(arguments, args...)
 		}
 
 		return builder.String(), arguments, nil
 	default:
-		return "?", []any{expression}, nil
+		return "?", []any{start}, nil
 	}
 }

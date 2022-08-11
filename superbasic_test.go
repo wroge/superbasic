@@ -151,13 +151,13 @@ func TestJoin(t *testing.T) {
 	}
 
 	sql, args, err = superbasic.Join(" ", nil).ToSQL()
-	if err.Error() != "invalid expression: expression at index '0' is nil" {
-		t.Fatalf(sql, args)
+	if err.Error() != "invalid expression: expression is nil at index '0'" {
+		t.Fatal(sql, args, err)
 	}
 
 	sql, args, err = superbasic.Compile("?", nil).ToSQL()
-	if err.Error() != "invalid expression: expression at index '0' is nil" {
-		t.Fatalf(sql, args)
+	if err.Error() != "invalid expression: expression is nil at index '0'" {
+		t.Fatal(sql, args, err)
 	}
 }
 

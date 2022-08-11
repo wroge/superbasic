@@ -1,4 +1,4 @@
-//nolint:exhaustivestruct,exhaustruct,wrapcheck,ireturn,exhaustive
+//nolint:exhaustivestruct,exhaustruct,ireturn
 package superbasic
 
 import (
@@ -25,11 +25,19 @@ func (e ExpressionError) Error() string {
 		return fmt.Sprintf("invalid expression: %s", e.Err.Error())
 	}
 
-	return "invalid expression"
+	return "invalid expression: expression is nil"
 }
 
 func (e ExpressionError) Unwrap() error {
 	return e.Err
+}
+
+type ExpressionIndexError struct {
+	Index int
+}
+
+func (e ExpressionIndexError) Error() string {
+	return fmt.Sprintf("expression is nil at index '%d'", e.Index)
 }
 
 type Expression interface {
@@ -82,7 +90,7 @@ func (c Compiler) ToSQL() (string, []any, error) {
 
 		if c.Expressions[exprIndex] == nil {
 			return "", nil, ExpressionError{
-				Err: fmt.Errorf("expression at index '%d' is nil", exprIndex),
+				Err: ExpressionIndexError{Index: exprIndex},
 			}
 		}
 
@@ -128,7 +136,7 @@ func (j Joiner) ToSQL() (string, []any, error) {
 	for i, expr := range j.Expressions {
 		if expr == nil {
 			return "", nil, ExpressionError{
-				Err: fmt.Errorf("expression at index '%d' is nil", i),
+				Err: ExpressionIndexError{Index: i},
 			}
 		}
 
@@ -254,9 +262,7 @@ func (r Raw) ToSQL() (string, []any, error) {
 
 func Finalize(placeholder string, expr Expression) (string, []any, error) {
 	if expr == nil {
-		return "", nil, ExpressionError{
-			Err: fmt.Errorf("expression is nil"),
-		}
+		return "", nil, ExpressionError{}
 	}
 
 	sql, args, err := expr.ToSQL()

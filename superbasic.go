@@ -44,6 +44,10 @@ type Expression interface {
 	ToSQL() (string, []any, error)
 }
 
+func Value(a any) Raw {
+	return Raw{SQL: "?", Args: []any{a}}
+}
+
 type Values []any
 
 func (v Values) ToSQL() (string, []any, error) {
@@ -260,7 +264,7 @@ func (r Raw) ToSQL() (string, []any, error) {
 	return r.SQL, r.Args, r.Err
 }
 
-func Finalize(placeholder string, expr Expression) (string, []any, error) {
+func ToPositional(placeholder string, expr Expression) (string, []any, error) {
 	if expr == nil {
 		return "", nil, ExpressionError{}
 	}

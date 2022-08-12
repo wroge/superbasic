@@ -24,7 +24,7 @@ func TestInsert(t *testing.T) {
 		),
 	)
 
-	sql, args, err := superbasic.Finalize("$", insert)
+	sql, args, err := superbasic.ToPositional("$", insert)
 	if err != nil {
 		t.Error(err)
 	}
@@ -96,7 +96,7 @@ func TestDelete(t *testing.T) {
 		),
 	)
 
-	sql, args, err := superbasic.Finalize("$", del)
+	sql, args, err := superbasic.ToPositional("$", del)
 	if err != nil {
 		t.Error(err)
 	}
@@ -111,7 +111,7 @@ func TestEscape(t *testing.T) {
 
 	expr := superbasic.Compile("?? hello ? ??", superbasic.SQL("?", "world"))
 
-	sql, args, err := superbasic.Finalize("$", expr)
+	sql, args, err := superbasic.ToPositional("$", expr)
 	if err != nil {
 		t.Error(err)
 	}
@@ -142,7 +142,7 @@ func TestExpressionSlice(t *testing.T) {
 func TestJoin(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.Finalize("$", superbasic.Join(", ",
+	sql, args, err := superbasic.ToPositional("$", superbasic.Join(", ",
 		superbasic.SQL(""),
 		superbasic.SQL("? ?", "hello"),
 	))
@@ -215,17 +215,17 @@ func TestNotEquals(t *testing.T) {
 func TestPositional(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.Finalize("$", nil)
+	sql, args, err := superbasic.ToPositional("$", nil)
 	if err.Error() != "invalid expression: expression is nil" {
 		t.Fatal(sql, args, err)
 	}
 
-	sql, args, err = superbasic.Finalize("$", superbasic.SQL("?"))
+	sql, args, err = superbasic.ToPositional("$", superbasic.SQL("?"))
 	if !errors.Is(err, superbasic.NumberOfArgumentsError{}) {
 		t.Fatal(sql, args, err)
 	}
 
-	sql, args, err = superbasic.Finalize("$", superbasic.SQL("?"))
+	sql, args, err = superbasic.ToPositional("$", superbasic.SQL("?"))
 	if !errors.Is(err, superbasic.NumberOfArgumentsError{}) {
 		t.Fatal(sql, args, err)
 	}
@@ -316,5 +316,11 @@ func TestDelete2(t *testing.T) {
 
 	if sql != "DELETE FROM presidents WHERE last = ?" {
 		t.Fatal(sql, args)
+	}
+}
+
+func TestValue(t *testing.T) {
+	if len(superbasic.Value("hello").Args) != 1 {
+		t.Fatal()
 	}
 }

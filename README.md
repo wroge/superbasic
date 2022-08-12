@@ -30,7 +30,7 @@ expr := superbasic.Compile("INSERT INTO presidents (nr, first, last) VALUES ? RE
 	),
 )
 
-fmt.Println(superbasic.Finalize("$", expr))
+fmt.Println(superbasic.ToPositional("$", expr))
 // INSERT INTO presidents (nr, first, last) VALUES
 // 		($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12), ($13, $14, $15), ($16, $17, $18)
 //		RETURNING id
@@ -80,7 +80,7 @@ insert := superbasic.Insert{
 		{41, "George H. W.", "Bush"},
 	},
 }
-fmt.Println(superbasic.Finalize("$", superbasic.Compile("? RETURNING id", insert)))
+fmt.Println(superbasic.ToPositional("$", superbasic.Compile("? RETURNING id", insert)))
 // INSERT INTO presidents (nr, first, last) VALUES
 // 		($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12), ($13, $14, $15), ($16, $17, $18)
 //		RETURNING id

@@ -1,4 +1,4 @@
-//nolint:gofumpt,exhaustivestruct,exhaustruct,staticcheck,gosimple
+//nolint:exhaustivestruct,exhaustruct,staticcheck,gosimple
 package superbasic_test
 
 import (
@@ -228,94 +228,6 @@ func TestPositional(t *testing.T) {
 	sql, args, err = superbasic.ToPositional("$", superbasic.SQL("?"))
 	if !errors.Is(err, superbasic.NumberOfArgumentsError{}) {
 		t.Fatal(sql, args, err)
-	}
-}
-
-func TestQuery2(t *testing.T) {
-	t.Parallel()
-
-	sql, args, err := superbasic.Query{
-		With:    superbasic.SQL("with"),
-		Select:  superbasic.SQL("column"),
-		From:    superbasic.SQL("from"),
-		Where:   superbasic.SQL("where"),
-		GroupBy: superbasic.SQL("group"),
-		Having:  superbasic.SQL("having"),
-		Window:  superbasic.SQL("window"),
-		OrderBy: superbasic.SQL("order"),
-		Limit:   1,
-		Offset:  1,
-	}.ToSQL()
-	if err != nil {
-		t.Error(err)
-	}
-
-	if sql != "WITH with SELECT column FROM from WHERE where GROUP BY group HAVING having"+
-		" WINDOW window ORDER BY order LIMIT 1 OFFSET 1" {
-		t.Fatal(sql, args)
-	}
-}
-
-func TestInsert2(t *testing.T) {
-	t.Parallel()
-
-	sql, args, err := superbasic.Insert{
-		Into:    "presidents",
-		Columns: []string{"nr", "first", "last"},
-		Data: []superbasic.Values{
-			{46, "Joe", "Biden"},
-			{45, "Donald", "trump"},
-			{44, "Barack", "Obama"},
-			{43, "George W.", "Bush"},
-			{42, "Bill", "Clinton"},
-			{41, "George H. W.", "Bush"},
-		},
-	}.ToSQL()
-	if err != nil {
-		t.Error(err)
-	}
-
-	if sql != "INSERT INTO presidents (nr, first, last) VALUES"+
-		" (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?)" {
-		t.Fatal(sql, args, err)
-	}
-}
-
-func TestUpdate2(t *testing.T) {
-	t.Parallel()
-
-	sql, args, err := superbasic.Update{
-		Table: "presidents",
-		Sets: []superbasic.Expression{
-			superbasic.SQL("first = ?", "Donald"),
-			superbasic.SQL("last = ?", "Trump"),
-		},
-		Where: superbasic.SQL("nr = ?", 45),
-	}.ToSQL()
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	if sql != "UPDATE presidents SET first = ?, last = ? WHERE nr = ?" {
-		t.Fatal(sql, args)
-	}
-}
-
-func TestDelete2(t *testing.T) {
-	t.Parallel()
-
-	sql, args, err := superbasic.Delete{
-		From:  "presidents",
-		Where: superbasic.SQL("last = ?", "Bush"),
-	}.ToSQL()
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	if sql != "DELETE FROM presidents WHERE last = ?" {
-		t.Fatal(sql, args)
 	}
 }
 

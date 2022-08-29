@@ -320,6 +320,8 @@ func TestDelete2(t *testing.T) {
 }
 
 func TestValue(t *testing.T) {
+	t.Parallel()
+
 	if len(superbasic.Value("hello").Args) != 1 {
 		t.Fatal()
 	}

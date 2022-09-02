@@ -1,4 +1,4 @@
-//nolint:exhaustivestruct,exhaustruct,staticcheck,gosimple
+//nolint:exhaustivestruct,exhaustruct,staticcheck,gosimple,goconst
 package superbasic_test
 
 import (
@@ -24,7 +24,7 @@ func TestInsert(t *testing.T) {
 		),
 	)
 
-	sql, args, err := superbasic.ToPositional("$", insert)
+	sql, args, err := superbasic.Finalize("$%d", insert)
 	if err != nil {
 		t.Error(err)
 	}
@@ -96,7 +96,7 @@ func TestDelete(t *testing.T) {
 		),
 	)
 
-	sql, args, err := superbasic.ToPositional("$", del)
+	sql, args, err := superbasic.Finalize("$%d", del)
 	if err != nil {
 		t.Error(err)
 	}
@@ -111,7 +111,7 @@ func TestEscape(t *testing.T) {
 
 	expr := superbasic.Compile("?? hello ? ??", superbasic.SQL("?", "world"))
 
-	sql, args, err := superbasic.ToPositional("$", expr)
+	sql, args, err := superbasic.Finalize("$%d", expr)
 	if err != nil {
 		t.Error(err)
 	}
@@ -142,21 +142,21 @@ func TestExpressionSlice(t *testing.T) {
 func TestJoin(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.ToPositional("$", superbasic.Join(", ",
+	sql, args, err := superbasic.Finalize("$%d", superbasic.Join(", ",
 		superbasic.SQL(""),
 		superbasic.SQL("? ?", "hello"),
 	))
-	if err.Error() != "invalid number of arguments: got '1' want '1'" {
-		t.Fatal("NumberOfArgumentsError", sql, args, err)
+	if err.Error() != "superbasic.Error: 2 placeholders and 1 argument in '$1 $2'" {
+		t.Fatal(sql, args, err)
 	}
 
 	sql, args, err = superbasic.Join(" ", nil).ToSQL()
-	if err.Error() != "invalid expression: expression is nil at index '0'" {
+	if err.Error() != "superbasic.Error: expression at position '0' is nil" {
 		t.Fatal(sql, args, err)
 	}
 
 	sql, args, err = superbasic.Compile("?", nil).ToSQL()
-	if err.Error() != "invalid expression: expression is nil at index '0'" {
+	if err.Error() != "superbasic.Error: expression at position '0' is nil" {
 		t.Fatal(sql, args, err)
 	}
 }
@@ -215,18 +215,13 @@ func TestNotEquals(t *testing.T) {
 func TestPositional(t *testing.T) {
 	t.Parallel()
 
-	sql, args, err := superbasic.ToPositional("$", nil)
-	if err.Error() != "invalid expression: expression is nil" {
+	sql, args, err := superbasic.Finalize("$%d", nil)
+	if err.Error() != "superbasic.Error: expression at position '0' is nil" {
 		t.Fatal(sql, args, err)
 	}
 
-	sql, args, err = superbasic.ToPositional("$", superbasic.SQL("?"))
-	if !errors.Is(err, superbasic.NumberOfArgumentsError{}) {
-		t.Fatal(sql, args, err)
-	}
-
-	sql, args, err = superbasic.ToPositional("$", superbasic.SQL("?"))
-	if !errors.Is(err, superbasic.NumberOfArgumentsError{}) {
+	sql, args, err = superbasic.Finalize("$%d", superbasic.SQL("?"))
+	if !errors.As(err, &superbasic.Error{}) {
 		t.Fatal(sql, args, err)
 	}
 }

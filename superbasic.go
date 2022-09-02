@@ -6,38 +6,62 @@ import (
 	"strings"
 )
 
-// NumberOfArgumentsError is returned if arguments doesn't match the number of placeholders.
-type NumberOfArgumentsError struct {
-	Got, Want int
-}
-
-func (e NumberOfArgumentsError) Error() string {
-	return fmt.Sprintf("invalid number of arguments: got '%d' want '%d'", e.Got, e.Want)
-}
-
-// ExpressionError is returned if expressions are nil.
-type ExpressionError struct {
+// Error wraps any error in this package and can be used to create an Expression.
+type Error struct {
 	Err error
 }
 
-func (e ExpressionError) Error() string {
+func (e Error) Error() string {
 	if e.Err != nil {
-		return fmt.Sprintf("invalid expression: %s", e.Err.Error())
+		//nolint:errorlint
+		if err, ok := e.Err.(Error); ok {
+			return err.Error()
+		}
+
+		return fmt.Sprintf("superbasic.Error: %s", e.Err.Error())
 	}
 
-	return "invalid expression: expression is nil"
+	return "superbasic.Error"
 }
 
-func (e ExpressionError) Unwrap() error {
+func (e Error) Unwrap() error {
 	return e.Err
 }
 
-type ExpressionIndexError struct {
-	Index int
+func (e Error) ToSQL() (string, []any, error) {
+	return "", nil, e
 }
 
-func (e ExpressionIndexError) Error() string {
-	return fmt.Sprintf("expression is nil at index '%d'", e.Index)
+// ExpressionError is returned by the Compile Expression, if an expression is nil.
+type ExpressionError struct {
+	Position int
+}
+
+func (e ExpressionError) Error() string {
+	return fmt.Sprintf("expression at position '%d' is nil", e.Position)
+}
+
+// NumberOfArgumentsError is returned if arguments doesn't match the number of placeholders.
+type NumberOfArgumentsError struct {
+	SQL                     string
+	Placeholders, Arguments int
+}
+
+func (e NumberOfArgumentsError) Error() string {
+	argument := "argument"
+
+	if e.Arguments > 1 {
+		argument += "s"
+	}
+
+	placeholder := "placeholder"
+
+	if e.Placeholders > 1 {
+		placeholder += "s"
+	}
+
+	return fmt.Sprintf("%d %s and %d %s in '%s'",
+		e.Placeholders, placeholder, e.Arguments, argument, e.SQL)
 }
 
 type Expression interface {
@@ -89,13 +113,17 @@ func (c Compiler) ToSQL() (string, []any, error) {
 		exprIndex++
 
 		if exprIndex >= len(c.Expressions) {
-			return "", nil, NumberOfArgumentsError{Got: exprIndex, Want: len(c.Expressions)}
+			return "", nil, Error{
+				Err: NumberOfArgumentsError{
+					SQL:          builder.String(),
+					Placeholders: exprIndex,
+					Arguments:    len(c.Expressions),
+				},
+			}
 		}
 
 		if c.Expressions[exprIndex] == nil {
-			return "", nil, ExpressionError{
-				Err: ExpressionIndexError{Index: exprIndex},
-			}
+			return "", nil, Error{Err: ExpressionError{Position: exprIndex}}
 		}
 
 		builder.WriteString(c.Template[:index])
@@ -103,7 +131,7 @@ func (c Compiler) ToSQL() (string, []any, error) {
 
 		sql, args, err := c.Expressions[exprIndex].ToSQL()
 		if err != nil {
-			return "", nil, ExpressionError{Err: err}
+			return "", nil, Error{Err: err}
 		}
 
 		builder.WriteString(sql)
@@ -111,8 +139,14 @@ func (c Compiler) ToSQL() (string, []any, error) {
 		arguments = append(arguments, args...)
 	}
 
-	if exprIndex >= len(c.Expressions) {
-		return "", nil, NumberOfArgumentsError{Got: exprIndex, Want: len(c.Expressions)}
+	if exprIndex != len(c.Expressions)-1 {
+		return "", nil, Error{
+			Err: NumberOfArgumentsError{
+				SQL:          builder.String(),
+				Placeholders: exprIndex,
+				Arguments:    len(c.Expressions),
+			},
+		}
 	}
 
 	return builder.String(), arguments, nil
@@ -137,16 +171,14 @@ func (j Joiner) ToSQL() (string, []any, error) {
 
 	isFirst := true
 
-	for i, expr := range j.Expressions {
+	for _, expr := range j.Expressions {
 		if expr == nil {
-			return "", nil, ExpressionError{
-				Err: ExpressionIndexError{Index: i},
-			}
+			return "", nil, Error{Err: ExpressionError{}}
 		}
 
 		sql, args, err := expr.ToSQL()
 		if err != nil {
-			return "", nil, ExpressionError{Err: err}
+			return "", nil, Error{Err: err}
 		}
 
 		if sql == "" {
@@ -197,18 +229,45 @@ func (r Raw) ToSQL() (string, []any, error) {
 	return r.SQL, r.Args, r.Err
 }
 
-func ToPositional(placeholder string, expr Expression) (string, []any, error) {
-	if expr == nil {
-		return "", nil, ExpressionError{}
+// Finalize takes a static placeholder like '?' or a positional placeholder containing '%d'.
+// Escaped placeholders ('??') are replaced to '?' when placeholder argument is not '?'.
+func Finalize(placeholder string, expression Expression) (string, []any, error) {
+	if expression == nil {
+		return "", nil, Error{Err: ExpressionError{}}
 	}
 
-	sql, args, err := expr.ToSQL()
+	sql, args, err := expression.ToSQL()
 	if err != nil {
-		return "", nil, ExpressionError{Err: err}
+		return "", nil, Error{Err: err}
 	}
 
+	var count int
+
+	sql, count = Replace(placeholder, sql)
+
+	if count != len(args) {
+		return "", nil, Error{Err: NumberOfArgumentsError{SQL: sql, Placeholders: count, Arguments: len(args)}}
+	}
+
+	return sql, args, nil
+}
+
+// Replace takes a static placeholder like '?' or a positional placeholder containing '%d'.
+// Escaped placeholders ('??') are replaced to '?' when placeholder argument is not '?'.
+func Replace(placeholder string, sql string) (string, int) {
 	build := &strings.Builder{}
-	argIndex := -1
+	count := 0
+
+	question := "?"
+	positional := false
+
+	if placeholder == "?" {
+		question = "??"
+	}
+
+	if strings.Contains(placeholder, "%d") {
+		positional = true
+	}
 
 	for {
 		index := strings.IndexRune(sql, '?')
@@ -219,33 +278,24 @@ func ToPositional(placeholder string, expr Expression) (string, []any, error) {
 		}
 
 		if index < len(sql)-1 && sql[index+1] == '?' {
-			build.WriteString(sql[:index+1])
+			build.WriteString(sql[:index] + question)
 			sql = sql[index+2:]
 
 			continue
 		}
 
-		argIndex++
+		count++
 
-		build.WriteString(fmt.Sprintf("%s%s%d", sql[:index], placeholder, argIndex+1))
+		build.WriteString(sql[:index])
+
+		if positional {
+			build.WriteString(fmt.Sprintf(placeholder, count))
+		} else {
+			build.WriteString(placeholder)
+		}
+
 		sql = sql[index+1:]
 	}
 
-	if argIndex != len(args)-1 {
-		return "", nil, NumberOfArgumentsError{Got: argIndex, Want: len(args)}
-	}
-
-	return build.String(), args, nil
-}
-
-// Slice creates a slice of expressions from any slice of expressions.
-// This function will exists util there are better alternatives.
-func Slice[T Expression](s []T) []Expression {
-	out := make([]Expression, len(s))
-
-	for i := range out {
-		out[i] = s[i]
-	}
-
-	return out
+	return build.String(), count
 }

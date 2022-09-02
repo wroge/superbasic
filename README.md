@@ -21,33 +21,93 @@ import (
 )
 
 func main() {
-	expr := superbasic.Compile("INSERT INTO presidents (nr, first, last) VALUES ? RETURNING id",
-		superbasic.Join(", ",
-			superbasic.Values{46, "Joe", "Biden"},
-			superbasic.Values{45, "Donald", "trump"},
-			superbasic.Values{44, "Barack", "Obama"},
-			superbasic.Values{43, "George W.", "Bush"},
-			superbasic.Values{42, "Bill", "Clinton"},
-			superbasic.Values{41, "George H. W.", "Bush"},
+	// 1. CREATE SCHEMA
+
+	create := superbasic.Compile("CREATE TABLE presidents (\n\t?\n)",
+		superbasic.Join(",\n\t",
+			superbasic.SQL("nr SERIAL PRIMARY KEY"),
+			superbasic.SQL("first TEXT NOT NULL"),
+			superbasic.SQL("last TEXT NOT NULL"),
 		),
 	)
 
-	fmt.Println(superbasic.Finalize("$%d", expr))
-	// INSERT INTO presidents (nr, first, last) VALUES
-	// 		($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ($10, $11, $12), ($13, $14, $15), ($16, $17, $18)
-	//		RETURNING id
-	// [46 Joe Biden 45 Donald trump 44 Barack Obama 43 George W. Bush 42 Bill Clinton 41 George H. W. Bush]
+	fmt.Println(create.ToSQL())
+	// CREATE TABLE presidents (
+	//	nr SERIAL PRIMARY KEY,
+	//	first TEXT NOT NULL,
+	//	last TEXT NOT NULL
+	// )
 
-	expr = superbasic.Compile("UPDATE presidents SET ? WHERE ?",
-		superbasic.Join(", ",
-			superbasic.SQL("first = ?", "Donald"),
-			superbasic.SQL("last = ?", "Trump"),
+	// 2. INSERT
+
+	insert := superbasic.Join(" ",
+		superbasic.SQL("INSERT INTO presidents (first, last)"),
+		superbasic.Compile("VALUES ?",
+			superbasic.Join(", ",
+				superbasic.Map(presidents,
+					func(president President) superbasic.Expression {
+						return superbasic.Values{president.First, president.Last}
+					})...,
+			),
 		),
-		superbasic.SQL("nr = ?", 45),
+		superbasic.SQL("RETURNING nr"),
 	)
 
-	fmt.Println(expr.ToSQL())
-	// UPDATE presidents SET first = ?, last = ? WHERE nr = ?
-	// [Donald Trump 45]
+	fmt.Println(superbasic.Finalize("$%d", insert))
+	// INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4) RETURNING nr [George Washington John Adams]
+}
+
+type President struct {
+	First string
+	Last  string
+}
+
+var presidents = []President{
+	{"George", "Washington"},
+	{"John", "Adams"},
+	// {"Thomas", "Jefferson"},
+	// {"James", "Madison"},
+	// {"James", "Monroe"},
+	// {"John Quincy", "Adams"},
+	// {"Andrew", "Jackson"},
+	// {"Martin", "Van Buren"},
+	// {"William Henry", "Harrison"},
+	// {"John", "Tyler"},
+	// {"James K.", "Polk"},
+	// {"Zachary", "Taylor"},
+	// {"Millard", "Fillmore"},
+	// {"Franklin", "Pierce"},
+	// {"James", "Buchanan"},
+	// {"Abraham", "Lincoln"},
+	// {"Andrew", "Johnson"},
+	// {"Ulysses S.", "Grant"},
+	// {"Rutherford B.", "Hayes"},
+	// {"James A.", "Garfield"},
+	// {"Chester A.", "Arthur"},
+	// {"Grover", "Cleveland"},
+	// {"Benjamin", "Harrison"},
+	// {"Grover", "Cleveland"},
+	// {"William", "McKinley"},
+	// {"Theodore", "Roosevelt"},
+	// {"William Howard", "Taft"},
+	// {"Woodrow", "Wilson"},
+	// {"Warren G.", "Harding"},
+	// {"Calvin", "Coolidge"},
+	// {"Herbert", "Hoover"},
+	// {"Franklin D.", "Roosevelt"},
+	// {"Harry S.", "Truman"},
+	// {"Dwight D.", "Eisenhower"},
+	// {"John F.", "Kennedy"},
+	// {"Lyndon B.", "Johnson"},
+	// {"Richard", "Nixon"},
+	// {"Gerald", "Ford"},
+	// {"Jimmy", "Carter"},
+	// {"Ronald", "Reagan"},
+	// {"George H. W.", "Bush"},
+	// {"Bill", "Clinton"},
+	// {"George W.", "Bush"},
+	// {"Barack", "Obama"},
+	// {"Donald", "Trump"},
+	// {"Joe", "Biden"},
 }
 ```

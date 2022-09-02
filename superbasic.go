@@ -299,3 +299,15 @@ func Replace(placeholder string, sql string) (string, int) {
 
 	return build.String(), count
 }
+
+// Map is a generic function for mapping one slice to another slice.
+// It is useful for creating a slice of expressions as input to the join function.
+func Map[From any, To any](from []From, mapper func(From) To) []To {
+	toSlice := make([]To, len(from))
+
+	for i, f := range from {
+		toSlice[i] = mapper(f)
+	}
+
+	return toSlice
+}

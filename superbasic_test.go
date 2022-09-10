@@ -1,4 +1,4 @@
-//nolint:exhaustivestruct,exhaustruct,staticcheck,gosimple,goconst
+//nolint:exhaustivestruct,exhaustruct,goconst
 package superbasic_test
 
 import (
@@ -60,9 +60,7 @@ func TestUpdate(t *testing.T) {
 func TestQuery(t *testing.T) {
 	t.Parallel()
 
-	var search superbasic.Expression
-
-	search = superbasic.Join(" AND ",
+	search := superbasic.Join(" AND ",
 		superbasic.Compile("last IN ?", superbasic.Values{"Bush", "Clinton"}),
 		superbasic.SQL("NOT (nr > ?)", 42),
 	)
@@ -71,7 +69,7 @@ func TestQuery(t *testing.T) {
 
 	query := superbasic.Append(
 		superbasic.SQL("SELECT nr, first, last FROM presidents"),
-		superbasic.If(search != nil, superbasic.Compile(" WHERE ?", search)),
+		superbasic.Compile(" WHERE ?", search),
 		superbasic.If(sort != "", superbasic.SQL(fmt.Sprintf(" ORDER BY %s", sort))),
 	)
 

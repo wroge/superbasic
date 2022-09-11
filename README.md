@@ -55,7 +55,7 @@ func main() {
 	)
 
 	fmt.Println(superbasic.Finalize("$%d", insert))
-	// INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4) RETURNING nr [George Washington John Adams]
+	// INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4) RETURNING nr [George Washington John Adams] nil
 }
 
 type President struct {

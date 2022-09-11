@@ -1,4 +1,4 @@
-//nolint:exhaustivestruct,exhaustruct,ireturn
+//nolint:exhaustivestruct,exhaustruct,ireturn,wrapcheck
 package superbasic
 
 import (
@@ -103,7 +103,7 @@ func (c Compiler) ToSQL() (string, []any, error) {
 
 		sql, args, err := c.Expressions[exprIndex].ToSQL()
 		if err != nil {
-			return "", nil, fmt.Errorf("wroge/superbasic error: %w", err)
+			return "", nil, err
 		}
 
 		builder.WriteString(sql)
@@ -148,7 +148,7 @@ func (j Joiner) ToSQL() (string, []any, error) {
 
 		sql, args, err := expr.ToSQL()
 		if err != nil {
-			return "", nil, fmt.Errorf("wroge/superbasic error: %w", err)
+			return "", nil, err
 		}
 
 		if sql == "" {
@@ -208,7 +208,7 @@ func Finalize(placeholder string, expression Expression) (string, []any, error) 
 
 	sql, args, err := expression.ToSQL()
 	if err != nil {
-		return "", nil, fmt.Errorf("wroge/superbasic error: %w", err)
+		return "", nil, err
 	}
 
 	var count int

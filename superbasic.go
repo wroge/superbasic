@@ -6,39 +6,13 @@ import (
 	"strings"
 )
 
-// Error wraps any error in this package and can be used to create an Expression.
-type Error struct {
-	Err error
-}
-
-func (e Error) Error() string {
-	if e.Err != nil {
-		//nolint:errorlint
-		if err, ok := e.Err.(Error); ok {
-			return err.Error()
-		}
-
-		return fmt.Sprintf("superbasic.Error: %s", e.Err.Error())
-	}
-
-	return "superbasic.Error"
-}
-
-func (e Error) Unwrap() error {
-	return e.Err
-}
-
-func (e Error) ToSQL() (string, []any, error) {
-	return "", nil, e
-}
-
 // ExpressionError is returned by the Compile Expression, if an expression is nil.
 type ExpressionError struct {
 	Position int
 }
 
 func (e ExpressionError) Error() string {
-	return fmt.Sprintf("expression at position '%d' is nil", e.Position)
+	return fmt.Sprintf("wroge/superbasic error: expression at position '%d' is nil", e.Position)
 }
 
 // NumberOfArgumentsError is returned if arguments doesn't match the number of placeholders.
@@ -60,7 +34,7 @@ func (e NumberOfArgumentsError) Error() string {
 		placeholder += "s"
 	}
 
-	return fmt.Sprintf("%d %s and %d %s in '%s'",
+	return fmt.Sprintf("wroge/superbasic error: %d %s and %d %s in '%s'",
 		e.Placeholders, placeholder, e.Arguments, argument, e.SQL)
 }
 
@@ -113,17 +87,15 @@ func (c Compiler) ToSQL() (string, []any, error) {
 		exprIndex++
 
 		if exprIndex >= len(c.Expressions) {
-			return "", nil, Error{
-				Err: NumberOfArgumentsError{
-					SQL:          builder.String(),
-					Placeholders: exprIndex,
-					Arguments:    len(c.Expressions),
-				},
+			return "", nil, NumberOfArgumentsError{
+				SQL:          builder.String(),
+				Placeholders: exprIndex,
+				Arguments:    len(c.Expressions),
 			}
 		}
 
 		if c.Expressions[exprIndex] == nil {
-			return "", nil, Error{Err: ExpressionError{Position: exprIndex}}
+			return "", nil, ExpressionError{Position: exprIndex}
 		}
 
 		builder.WriteString(c.Template[:index])
@@ -131,7 +103,7 @@ func (c Compiler) ToSQL() (string, []any, error) {
 
 		sql, args, err := c.Expressions[exprIndex].ToSQL()
 		if err != nil {
-			return "", nil, Error{Err: err}
+			return "", nil, fmt.Errorf("wroge/superbasic error: %w", err)
 		}
 
 		builder.WriteString(sql)
@@ -140,12 +112,10 @@ func (c Compiler) ToSQL() (string, []any, error) {
 	}
 
 	if exprIndex != len(c.Expressions)-1 {
-		return "", nil, Error{
-			Err: NumberOfArgumentsError{
-				SQL:          builder.String(),
-				Placeholders: exprIndex,
-				Arguments:    len(c.Expressions),
-			},
+		return "", nil, NumberOfArgumentsError{
+			SQL:          builder.String(),
+			Placeholders: exprIndex,
+			Arguments:    len(c.Expressions),
 		}
 	}
 
@@ -173,12 +143,12 @@ func (j Joiner) ToSQL() (string, []any, error) {
 
 	for _, expr := range j.Expressions {
 		if expr == nil {
-			return "", nil, Error{Err: ExpressionError{}}
+			return "", nil, ExpressionError{}
 		}
 
 		sql, args, err := expr.ToSQL()
 		if err != nil {
-			return "", nil, Error{Err: err}
+			return "", nil, fmt.Errorf("wroge/superbasic error: %w", err)
 		}
 
 		if sql == "" {
@@ -233,12 +203,12 @@ func (r Raw) ToSQL() (string, []any, error) {
 // Escaped placeholders ('??') are replaced to '?' when placeholder argument is not '?'.
 func Finalize(placeholder string, expression Expression) (string, []any, error) {
 	if expression == nil {
-		return "", nil, Error{Err: ExpressionError{}}
+		return "", nil, ExpressionError{}
 	}
 
 	sql, args, err := expression.ToSQL()
 	if err != nil {
-		return "", nil, Error{Err: err}
+		return "", nil, fmt.Errorf("wroge/superbasic error: %w", err)
 	}
 
 	var count int
@@ -246,7 +216,7 @@ func Finalize(placeholder string, expression Expression) (string, []any, error) 
 	sql, count = Replace(placeholder, sql)
 
 	if count != len(args) {
-		return "", nil, Error{Err: NumberOfArgumentsError{SQL: sql, Placeholders: count, Arguments: len(args)}}
+		return "", nil, NumberOfArgumentsError{SQL: sql, Placeholders: count, Arguments: len(args)}
 	}
 
 	return sql, args, nil

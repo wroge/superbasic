@@ -1,8 +1,7 @@
-//nolint:exhaustivestruct,exhaustruct,goconst
+//nolint:goconst
 package superbasic_test
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -144,17 +143,17 @@ func TestJoin(t *testing.T) {
 		superbasic.SQL(""),
 		superbasic.SQL("? ?", "hello"),
 	))
-	if err.Error() != "superbasic.Error: 2 placeholders and 1 argument in '$1 $2'" {
+	if err.Error() != "wroge/superbasic error: 2 placeholders and 1 argument in '$1 $2'" {
 		t.Fatal(sql, args, err)
 	}
 
 	sql, args, err = superbasic.Join(" ", nil).ToSQL()
-	if err.Error() != "superbasic.Error: expression at position '0' is nil" {
+	if err.Error() != "wroge/superbasic error: expression at position '0' is nil" {
 		t.Fatal(sql, args, err)
 	}
 
 	sql, args, err = superbasic.Compile("?", nil).ToSQL()
-	if err.Error() != "superbasic.Error: expression at position '0' is nil" {
+	if err.Error() != "wroge/superbasic error: expression at position '0' is nil" {
 		t.Fatal(sql, args, err)
 	}
 }
@@ -214,12 +213,7 @@ func TestPositional(t *testing.T) {
 	t.Parallel()
 
 	sql, args, err := superbasic.Finalize("$%d", nil)
-	if err.Error() != "superbasic.Error: expression at position '0' is nil" {
-		t.Fatal(sql, args, err)
-	}
-
-	sql, args, err = superbasic.Finalize("$%d", superbasic.SQL("?"))
-	if !errors.As(err, &superbasic.Error{}) {
+	if err.Error() != "wroge/superbasic error: expression at position '0' is nil" {
 		t.Fatal(sql, args, err)
 	}
 }

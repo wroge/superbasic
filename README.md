@@ -13,103 +13,59 @@ To scan rows to types, i recommend [wroge/scan](https://github.com/wroge/scan).
 
 Have a look at [wroge/esperanto](https://github.com/wroge/esperanto) as well. It is a database access layer that can help you better organize your queries.
 
+- ```Compile``` replaces placeholders ```?``` with expressions.
+- ```Join``` joins expressions by a separator.
+
 ```go
-package main
-
-import (
-	"fmt"
-
-	"github.com/wroge/superbasic"
+create := superbasic.Compile("CREATE TABLE presidents (\n\t?\n)",
+	superbasic.Join(",\n\t",
+		superbasic.SQL("nr SERIAL PRIMARY KEY"),
+		superbasic.SQL("first TEXT NOT NULL"),
+		superbasic.SQL("last TEXT NOT NULL"),
+	),
 )
 
-func main() {
-	// 1. CREATE SCHEMA
+fmt.Println(create.ToSQL())
+// CREATE TABLE presidents (
+//	nr SERIAL PRIMARY KEY,
+//	first TEXT NOT NULL,
+//	last TEXT NOT NULL
+// )
+```
 
-	create := superbasic.Compile("CREATE TABLE presidents (\n\t?\n)",
-		superbasic.Join(",\n\t",
-			superbasic.SQL("nr SERIAL PRIMARY KEY"),
-			superbasic.SQL("first TEXT NOT NULL"),
-			superbasic.SQL("last TEXT NOT NULL"),
-		),
-	)
+- ```Map``` is a generic Mapper function particularly helpful in the context of Join.
 
-	fmt.Println(create.ToSQL())
-	// CREATE TABLE presidents (
-	//	nr SERIAL PRIMARY KEY,
-	//	first TEXT NOT NULL,
-	//	last TEXT NOT NULL
-	// )
-
-	// 2. INSERT
-
-	insert := superbasic.Join(" ",
-		superbasic.SQL("INSERT INTO presidents (first, last)"),
-		superbasic.Compile("VALUES ?",
-			superbasic.Join(", ",
-				superbasic.Map(presidents,
-					func(_ int, president President) superbasic.Expression {
-						return superbasic.Values{president.First, president.Last}
-					})...,
-			),
-		),
-		superbasic.SQL("RETURNING nr"),
-	)
-
-	fmt.Println(superbasic.Finalize("$%d", insert))
-	// INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4) RETURNING nr [George Washington John Adams]
-}
-
-type President struct {
-	First string
-	Last  string
-}
-
-var presidents = []President{
+```go
+presidents := []President{
 	{"George", "Washington"},
 	{"John", "Adams"},
-	// {"Thomas", "Jefferson"},
-	// {"James", "Madison"},
-	// {"James", "Monroe"},
-	// {"John Quincy", "Adams"},
-	// {"Andrew", "Jackson"},
-	// {"Martin", "Van Buren"},
-	// {"William Henry", "Harrison"},
-	// {"John", "Tyler"},
-	// {"James K.", "Polk"},
-	// {"Zachary", "Taylor"},
-	// {"Millard", "Fillmore"},
-	// {"Franklin", "Pierce"},
-	// {"James", "Buchanan"},
-	// {"Abraham", "Lincoln"},
-	// {"Andrew", "Johnson"},
-	// {"Ulysses S.", "Grant"},
-	// {"Rutherford B.", "Hayes"},
-	// {"James A.", "Garfield"},
-	// {"Chester A.", "Arthur"},
-	// {"Grover", "Cleveland"},
-	// {"Benjamin", "Harrison"},
-	// {"Grover", "Cleveland"},
-	// {"William", "McKinley"},
-	// {"Theodore", "Roosevelt"},
-	// {"William Howard", "Taft"},
-	// {"Woodrow", "Wilson"},
-	// {"Warren G.", "Harding"},
-	// {"Calvin", "Coolidge"},
-	// {"Herbert", "Hoover"},
-	// {"Franklin D.", "Roosevelt"},
-	// {"Harry S.", "Truman"},
-	// {"Dwight D.", "Eisenhower"},
-	// {"John F.", "Kennedy"},
-	// {"Lyndon B.", "Johnson"},
-	// {"Richard", "Nixon"},
-	// {"Gerald", "Ford"},
-	// {"Jimmy", "Carter"},
-	// {"Ronald", "Reagan"},
-	// {"George H. W.", "Bush"},
-	// {"Bill", "Clinton"},
-	// {"George W.", "Bush"},
-	// {"Barack", "Obama"},
-	// {"Donald", "Trump"},
-	// {"Joe", "Biden"},
 }
+
+insert := superbasic.Join(" ",
+	superbasic.SQL("INSERT INTO presidents (first, last)"),
+	superbasic.Compile("VALUES ?",
+		superbasic.Join(", ",
+			superbasic.Map(presidents,
+				func(_ int, president President) superbasic.Expression {
+					return superbasic.Values{president.First, president.Last}
+				})...,
+		),
+	),
+	superbasic.SQL("RETURNING nr"),
+)
+
+fmt.Println(superbasic.Finalize("$%d", insert))
+// INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4) RETURNING nr [George Washington John Adams]
+```
+
+- ```Switch``` returns an expression matching a value.
+
+```go
+var dialect string
+var contains string
+
+query := superbasic.Compile("SELECT * FROM presidents WHERE ?", superbasic.Switch(dialect,
+	superbasic.Case("postgres", superbasic.SQL("POSITION(? IN presidents.first)", contains)),
+	superbasic.Case("sqlite", superbasic.SQL("POSITION(? IN presidents.first)", contains)),
+))
 ```

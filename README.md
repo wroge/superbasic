@@ -9,8 +9,9 @@
 
 ```superbasic.Compile``` compiles expressions into an SQL template and thus offers an alternative to conventional query builders.
 
-If you need support for multiple SQL dialects, take a look at [wroge/esperanto](https://github.com/wroge/esperanto).
 To scan rows to types, i recommend [wroge/scan](https://github.com/wroge/scan).
+
+Have a look at [wroge/esperanto](https://github.com/wroge/esperanto) as well. It is a database access layer that can help you better organize your queries.
 
 ```go
 package main

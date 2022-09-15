@@ -169,6 +169,28 @@ func (j Joiner) ToSQL() (string, []any, error) {
 	return builder.String(), arguments, nil
 }
 
+func Switch[T comparable](value T, cases ...Caser[T]) Expression {
+	for _, cas := range cases {
+		if value == cas.Value {
+			return cas.Then
+		}
+	}
+
+	return Raw{}
+}
+
+func Case[T any](value T, then Expression) Caser[T] {
+	return Caser[T]{
+		Value: value,
+		Then:  then,
+	}
+}
+
+type Caser[T any] struct {
+	Value T
+	Then  Expression
+}
+
 func If(condition bool, then Expression) Expression {
 	if condition {
 		return then

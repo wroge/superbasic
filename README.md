@@ -65,7 +65,7 @@ var dialect string
 var contains string
 
 query := superbasic.Compile("SELECT * FROM presidents WHERE ?", superbasic.Switch(dialect,
-	superbasic.Case("postgres", superbasic.SQL("POSITION(? IN presidents.first)", contains)),
-	superbasic.Case("sqlite", superbasic.SQL("POSITION(? IN presidents.first)", contains)),
+	superbasic.Case("postgres", superbasic.SQL("POSITION(? IN presidents.first) > 0", contains)),
+	superbasic.Case("sqlite", superbasic.SQL("INSTR(presidents.first, ?) > 0", contains)),
 ))
 ```

@@ -46,7 +46,7 @@ func main() {
 		superbasic.Compile("VALUES ?",
 			superbasic.Join(", ",
 				superbasic.Map(presidents,
-					func(president President) superbasic.Expression {
+					func(_ int, president President) superbasic.Expression {
 						return superbasic.Values{president.First, president.Last}
 					})...,
 			),
@@ -55,7 +55,7 @@ func main() {
 	)
 
 	fmt.Println(superbasic.Finalize("$%d", insert))
-	// INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4) RETURNING nr [George Washington John Adams] nil
+	// INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4) RETURNING nr [George Washington John Adams]
 }
 
 type President struct {

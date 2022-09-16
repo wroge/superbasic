@@ -34,6 +34,7 @@ fmt.Println(create.ToSQL())
 ```
 
 - ```Map``` is a generic Mapper function particularly helpful in the context of Join.
+- ```Finalize``` replaces ```?``` placeholders with a string that can contain a positional part by ```%d```.
 
 ```go
 presidents := []President{

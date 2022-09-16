@@ -169,6 +169,7 @@ func (j Joiner) ToSQL() (string, []any, error) {
 	return builder.String(), arguments, nil
 }
 
+// Switch returns a Expression of a Case matching a value.
 func Switch[T comparable](value T, cases ...Caser[T]) Expression {
 	for _, cas := range cases {
 		if value == cas.Value {
@@ -179,6 +180,7 @@ func Switch[T comparable](value T, cases ...Caser[T]) Expression {
 	return Raw{}
 }
 
+// Case returns a Caser that can be used inside the Switch statement.
 func Case[T any](value T, then Expression) Caser[T] {
 	return Caser[T]{
 		Value: value,

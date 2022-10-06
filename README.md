@@ -55,16 +55,19 @@ fmt.Println(superbasic.Finalize("$%d", insert))
 // INSERT INTO presidents (first, last) VALUES ($1, $2), ($3, $4) RETURNING nr [George Washington John Adams]
 ```
 
+- ```If``` condition is true, return expression, else skip.
 - ```Switch``` returns an expression matching a value.
 
 ```go
 dialect := "sqlite"
 contains := "Joe"
 
-query := superbasic.Compile("SELECT * FROM presidents WHERE ?", superbasic.Switch(dialect,
-	superbasic.Case("postgres", superbasic.SQL("POSITION(? IN presidents.first) > 0", contains)),
-	superbasic.Case("sqlite", superbasic.SQL("INSTR(presidents.first, ?) > 0", contains)),
-))
+query := superbasic.Join(" ", superbasic.SQL("SELECT * FROM presidents"),
+	superbasic.If(contains != "",
+		superbasic.Switch(dialect,
+			superbasic.Case("postgres", superbasic.SQL("POSITION(? IN presidents.first) > 0", contains)),
+			superbasic.Case("sqlite", superbasic.SQL("INSTR(presidents.first, ?) > 0", contains)),
+		)))
 
 fmt.Println(superbasic.Finalize("?", query))
 // SELECT * FROM presidents WHERE INSTR(presidents.first, ?) > 0 [Joe]

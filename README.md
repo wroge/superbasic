@@ -9,10 +9,6 @@
 
 ```superbasic.Compile``` compiles expressions into an SQL template and thus offers an alternative to conventional query builders.
 
-To scan rows to types, i recommend [wroge/scan](https://github.com/wroge/scan).
-
-Have a look at [wroge/esperanto](https://github.com/wroge/esperanto) as well. It is a database access layer that can help you better organize your queries.
-
 - ```Compile``` replaces placeholders ```?``` with expressions.
 - ```Join``` joins expressions by a separator.
 
@@ -33,7 +29,7 @@ fmt.Println(create.ToSQL())
 // )
 ```
 
-- ```Map``` is a generic Mapper function particularly helpful in the context of Join.
+- ```Map``` is a generic mapper function particularly helpful in the context of Join.
 - ```Finalize``` replaces ```?``` placeholders with a string that can contain a positional part by ```%d```.
 
 ```go
@@ -62,11 +58,16 @@ fmt.Println(superbasic.Finalize("$%d", insert))
 - ```Switch``` returns an expression matching a value.
 
 ```go
-var dialect string
-var contains string
+dialect := "sqlite"
+contains := "Joe"
 
 query := superbasic.Compile("SELECT * FROM presidents WHERE ?", superbasic.Switch(dialect,
 	superbasic.Case("postgres", superbasic.SQL("POSITION(? IN presidents.first) > 0", contains)),
 	superbasic.Case("sqlite", superbasic.SQL("INSTR(presidents.first, ?) > 0", contains)),
 ))
+
+fmt.Println(superbasic.Finalize("?", query))
+// SELECT * FROM presidents WHERE INSTR(presidents.first, ?) > 0 [Joe]
 ```
+
+To scan rows to types, i recommend [wroge/scan](https://github.com/wroge/scan).

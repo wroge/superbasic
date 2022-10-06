@@ -63,14 +63,14 @@ dialect := "sqlite"
 contains := "Joe"
 
 query := superbasic.Join(" ", superbasic.SQL("SELECT * FROM presidents"),
-	superbasic.If(contains != "",
+	superbasic.If(contains != "", superbasic.Compile("WHERE ?",
 		superbasic.Switch(dialect,
 			superbasic.Case("postgres", superbasic.SQL("POSITION(? IN presidents.first) > 0", contains)),
 			superbasic.Case("sqlite", superbasic.SQL("INSTR(presidents.first, ?) > 0", contains)),
-		)))
+		))))
 
 fmt.Println(superbasic.Finalize("?", query))
-// SELECT * FROM presidents WHERE INSTR(presidents.first, ?) > 0 [Joe]
+// SELECT * FROM presidents WHERE INSTR(presidents.first, ?) > 0 [Joe] <nil>
 ```
 
 To scan rows to types, i recommend [wroge/scan](https://github.com/wroge/scan).
